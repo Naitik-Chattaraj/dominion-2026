@@ -116,13 +116,13 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
               children: [
                 // Floating Dock Container with Liquid Glass Material
                 LiquidGlassContainer(
-                  borderRadius: 44.0, // Circular ends (Mac Dock capsule)
+                  borderRadius: 50.0, // Circular ends (Mac Dock capsule)
                   blurSigma: 20.0,
                   tintOpacity: 0.32,
                   tintColor: const Color(0xFF14011F),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10.0,
-                    vertical: 6.0,
+                    horizontal: 16.0,
+                    vertical: 8.0,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -132,10 +132,10 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                         // Mac dock separator before the last item (Settings/Studio)
                         if (widget.showSeparator && i == widget.items.length - 1)
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                            padding: const EdgeInsets.symmetric(horizontal: 6.0),
                             child: Container(
                               width: 1.2,
-                              height: 24.0,
+                              height: 26.0,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(1.0),
                                 gradient: LinearGradient(
@@ -207,7 +207,7 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
             curve: kLiquidGlassCurve, // Spring transition from liquid-glass.txt!
             transform: Matrix4.diagonal3Values(scale, scale, 1.0),
             transformAlignment: Alignment.bottomCenter,
-            padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 4.0),
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -219,8 +219,8 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 260),
                       curve: Curves.easeOutCubic,
-                      width: 40.0,
-                      height: 40.0,
+                      width: 48.0,
+                      height: 48.0,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: isSelected
@@ -236,7 +236,7 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                       child: Center(
                         child: Icon(
                           isSelected ? (item.activeIcon ?? item.icon) : item.icon,
-                          size: 22.0,
+                          size: 26.0,
                           color: isSelected
                               ? activeColor
                               : Colors.white.withValues(alpha: 0.72),

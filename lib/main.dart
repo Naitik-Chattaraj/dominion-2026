@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'theme/app_theme.dart';
 import 'widgets/liquid_glass_navbar.dart';
-import 'screens/home_screen.dart';
-import 'screens/analytics_screen.dart';
-import 'screens/threats_screen.dart';
-import 'screens/network_screen.dart';
-import 'screens/settings_screen.dart';
+import 'screens/auth/sign_in_screen.dart';
+import 'screens/home/riskgrid_home_screen.dart';
+import 'services/local_auth_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,8 +29,63 @@ class RiskGridApp extends StatelessWidget {
       title: 'RiskGrid',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const MainShellScreen(),
+      home: const AuthWrapper(),
     );
+  }
+}
+
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  final _localAuthService = LocalAuthService();
+  bool _isLoading = true;
+  bool _isLoggedIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final shouldLogin = await _localAuthService.shouldAutoLogin();
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = shouldLogin;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF070709),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFFD9779F),
+            strokeWidth: 2,
+          ),
+        ),
+      );
+    }
+    if (_isLoggedIn) {
+      return const MainShellScreen();
+    } else {
+      return SignInScreen(
+        onSignInSuccess: () {
+          setState(() {
+            _isLoggedIn = true;
+          });
+        },
+      );
+    }
   }
 }
 
@@ -40,119 +93,102 @@ class MainShellScreen extends StatefulWidget {
   const MainShellScreen({super.key});
 
   @override
-  State<MainShellScreen> createState() => _MainShellScreenState();
+  State<MainShellScreen> createState() => MainShellScreenState();
 }
 
-class _MainShellScreenState extends State<MainShellScreen> {
+class MainShellScreenState extends State<MainShellScreen> {
   int _currentIndex = 0;
 
   final List<DockItem> _dockItems = const [
     DockItem(
-      icon: CupertinoIcons.square_grid_2x2,
-      activeIcon: CupertinoIcons.square_grid_2x2_fill,
-      label: 'RiskGrid',
-      activeColor: Color(0xFF00E5FF), // Cyber Cyan
+      icon: CupertinoIcons.house_fill,
+      activeIcon: CupertinoIcons.house_fill,
+      label: 'Home',
+      activeColor: Color(0xFFD9779F),
     ),
     DockItem(
-      icon: CupertinoIcons.chart_bar_alt_fill,
-      activeIcon: CupertinoIcons.chart_bar_alt_fill,
-      label: 'Analytics',
-      activeColor: Color(0xFFA855F7), // Electric Violet
+      icon: CupertinoIcons.compass,
+      activeIcon: CupertinoIcons.compass_fill,
+      label: 'Explore',
+      activeColor: Color(0xFF00E5FF),
     ),
     DockItem(
-      icon: CupertinoIcons.shield,
-      activeIcon: CupertinoIcons.shield_fill,
-      label: 'Threats',
-      badgeCount: 3,
-      activeColor: Color(0xFFFF2A6D), // Neon Crimson
+      icon: CupertinoIcons.gear,
+      activeIcon: CupertinoIcons.gear_solid,
+      label: 'Settings',
+      activeColor: Color(0xFFA855F7),
     ),
     DockItem(
-      icon: CupertinoIcons.waveform_path_ecg,
-      activeIcon: CupertinoIcons.waveform_path_ecg,
-      label: 'Nodes',
-      activeColor: Color(0xFF10B981), // Emerald
-    ),
-    DockItem(
-      icon: CupertinoIcons.slider_horizontal_3,
-      activeIcon: CupertinoIcons.slider_horizontal_3,
-      label: 'Studio',
-      activeColor: Color(0xFFFBBF24), // Amber Gold
+      icon: CupertinoIcons.person,
+      activeIcon: CupertinoIcons.person_fill,
+      label: 'Profile',
+      activeColor: Color(0xFFFFB800),
     ),
   ];
+
+  void logout() async {
+    await LocalAuthService().signOut();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => const AuthWrapper(),
+        ),
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final screens = [
-      HomeScreen(
-        onNavigateToThreats: () => setState(() => _currentIndex = 2),
+      const RiskGridHomeScreen(),
+      const Center(
+        child: Text(
+          'Safe Route / Explore',
+          style: TextStyle(color: Colors.white, fontFamily: 'Inter'),
+        ),
       ),
-      const AnalyticsScreen(),
-      const ThreatsScreen(),
-      const NetworkScreen(),
-      const SettingsScreen(),
+      const Center(
+        child: Text(
+          'Settings & Sensors',
+          style: TextStyle(color: Colors.white, fontFamily: 'Inter'),
+        ),
+      ),
+      Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Profile',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: logout,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8A1E4A),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text('Sign Out', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
     ];
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: const Color(0xFF070709),
       body: Stack(
         children: [
-          // 1. Ambient Background Glow Gradients
-          // Radiant glowing blooms that shine through the frosted liquid glass navbar and cards
-          Positioned(
-            top: -120,
-            right: -80,
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF7C3AED).withValues(alpha: 0.28), // Violet bloom
-                    const Color(0xFF4C1D95).withValues(alpha: 0.12),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 40,
-            left: -80,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF00E5FF).withValues(alpha: 0.18), // Cyan bloom
-                    const Color(0xFF0D9488).withValues(alpha: 0.08),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 360,
-            left: 60,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFFFF2A6D).withValues(alpha: 0.08), // Crimson bloom
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // 2. Active Screen Content
+          // Screen content
           Positioned.fill(
             child: IndexedStack(
               index: _currentIndex,
@@ -160,11 +196,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
             ),
           ),
 
-          // 3. Floating Mac Dock Bottom Navigation Bar
-          // - Pill with circular ends on both sides (borderRadius: 44)
-          // - Lifted above the base (bottomOffset: 24.0 + safe area inset)
-          // - Exact Liquid Glass SVG/CSS styles with specular highlights & refraction
-          // - Mac Dock magnification, spring bounce, indicator dot & tooltips
+          // Floating Liquid Glass Dock Navbar
           Positioned(
             left: 0,
             right: 0,
@@ -173,7 +205,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
               currentIndex: _currentIndex,
               items: _dockItems,
               bottomOffset: 24.0,
-              showSeparator: true,
+              showSeparator: false,
               onTap: (index) {
                 setState(() => _currentIndex = index);
               },
