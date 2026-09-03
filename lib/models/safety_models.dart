@@ -18,6 +18,17 @@ extension SafetyStatusExtension on SafetyStatus {
     }
   }
 
+  double get headingFontSize {
+    switch (this) {
+      case SafetyStatus.allGood:
+        return 54.0;
+      case SafetyStatus.staySafe:
+        return 54.0;
+      case SafetyStatus.riskyArea:
+        return 41.0;
+    }
+  }
+
   List<Color> get ambientGradientColors {
     switch (this) {
       case SafetyStatus.allGood:

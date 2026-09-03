@@ -10,7 +10,7 @@ const Curve kLiquidGlassCurve = Cubic(0.175, 0.885, 0.32, 2.2);
 /// - .liquid-glass container box-shadows and spring dynamics
 /// - .liquidGlass-effect backdrop-filter blur and refraction
 /// - .liquidGlass-tint rgba(20, 1, 31, 0.308)
-/// - .liquidGlass-shine with top/bottom borders and inner glow (0 -30px 40px -20px rgba(255,255,255,0.15))
+/// - .liquidGlass-shine with top/bottom borders and inner glow
 /// - .liquidGlass-shine::before top-left corner specular highlight
 /// - .liquidGlass-shine::after bottom-right corner specular highlight
 /// - .glass-noise frosted grain texture
@@ -28,6 +28,7 @@ class LiquidGlassContainer extends StatelessWidget {
   final bool showNoise;
   final bool showCausticRefraction;
   final bool showShine;
+  final bool enableBlur; // Performance optimization: disable offscreen backdrop blur when on solid backgrounds
   final VoidCallback? onTap;
 
   const LiquidGlassContainer({
@@ -38,12 +39,13 @@ class LiquidGlassContainer extends StatelessWidget {
     this.padding,
     this.margin,
     this.borderRadius = 40.0,
-    this.blurSigma = 16.0,
+    this.blurSigma = 12.0,
     this.tintOpacity = 0.308,
     this.tintColor = const Color(0xFF14011F),
-    this.showNoise = true,
+    this.showNoise = false, // Disabled on mobile to avoid 120 drawPoints per frame
     this.showCausticRefraction = true,
     this.showShine = true,
+    this.enableBlur = true,
     this.onTap,
   });
 
@@ -51,81 +53,82 @@ class LiquidGlassContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveRadius = BorderRadius.circular(borderRadius);
 
-    Widget content = Container(
-      width: width,
-      height: height,
-      margin: margin,
-      decoration: BoxDecoration(
-        borderRadius: effectiveRadius,
-        boxShadow: [
-          // 0 6px 6px rgba(0, 0, 0, 0.2)
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.20),
-            blurRadius: 6,
-            offset: const Offset(0, 6),
-          ),
-          // 0 0 20px rgba(0, 0, 0, 0.1)
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 20,
-            offset: Offset.zero,
-          ),
-          // Ambient deep violet bounce shadow
-          BoxShadow(
-            color: const Color(0xFF581C87).withValues(alpha: 0.12),
-            blurRadius: 28,
-            spreadRadius: -4,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: effectiveRadius,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(
-            sigmaX: blurSigma,
-            sigmaY: blurSigma,
-          ),
-          child: Stack(
-            fit: StackFit.passthrough,
-            children: [
-              // 1. .liquidGlass-tint: background: rgba(20, 1, 31, 0.308);
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: effectiveRadius,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        tintColor.withValues(alpha: tintOpacity * 1.15),
-                        tintColor.withValues(alpha: tintOpacity),
-                        const Color(0xFF090314).withValues(alpha: tintOpacity * 1.25),
-                      ],
-                    ),
-                  ),
-                ),
+    Widget innerLayers = Stack(
+      fit: StackFit.passthrough,
+      children: [
+        // 1. .liquidGlass-tint: background: rgba(20, 1, 31, 0.308);
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: effectiveRadius,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  tintColor.withValues(alpha: tintOpacity * 1.15),
+                  tintColor.withValues(alpha: tintOpacity),
+                  const Color(0xFF090314).withValues(alpha: tintOpacity * 1.25),
+                ],
               ),
+            ),
+          ),
+        ),
 
-              // 2. Liquid Glass Painter: SVG specular lighting, corner shines, borders, inner glow, noise
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _LiquidGlassPainter(
-                    borderRadius: borderRadius,
-                    showNoise: showNoise,
-                    showCaustic: showCausticRefraction,
-                    showShine: showShine,
-                  ),
-                ),
-              ),
-
-              // 3. Main Child Content
-              Padding(
-                padding: padding ?? EdgeInsets.zero,
-                child: child,
-              ),
-            ],
+        // 2. Liquid Glass Painter: SVG specular lighting, corner shines, borders, inner glow
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _LiquidGlassPainter(
+              borderRadius: borderRadius,
+              showNoise: showNoise,
+              showCaustic: showCausticRefraction,
+              showShine: showShine,
+            ),
           ),
+        ),
+
+        // 3. Main Child Content
+        Padding(
+          padding: padding ?? EdgeInsets.zero,
+          child: child,
+        ),
+      ],
+    );
+
+    // If blur is enabled (e.g. floating dock), wrap in BackdropFilter;
+    // Otherwise render high-performance direct glass layers without offscreen framebuffer copies!
+    Widget filteredContent = enableBlur
+        ? BackdropFilter(
+            filter: ui.ImageFilter.blur(
+              sigmaX: blurSigma,
+              sigmaY: blurSigma,
+            ),
+            child: innerLayers,
+          )
+        : innerLayers;
+
+    Widget content = RepaintBoundary(
+      child: Container(
+        width: width,
+        height: height,
+        margin: margin,
+        decoration: BoxDecoration(
+          borderRadius: effectiveRadius,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 6,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: const Color(0xFF581C87).withValues(alpha: 0.10),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: effectiveRadius,
+          child: filteredContent,
         ),
       ),
     );
@@ -142,26 +145,12 @@ class LiquidGlassContainer extends StatelessWidget {
   }
 }
 
-/// Custom painter that replicates the SVG filter and CSS pseudo-elements:
-/// - Top-left specular highlight (radial gradient fade, #fff 1.2px/2px)
-/// - Bottom-right specular highlight (radial gradient fade, #fff 1.5px)
-/// - Top border 0.7px solid rgba(255, 255, 255, 0.356)
-/// - Bottom border 0.1px solid rgba(255, 255, 255, 0.3)
-/// - Inset upward glow: 0 -30px 40px -20px rgba(255, 255, 255, 0.15) inset
-/// - Caustic displacement shimmer from feSpecularLighting / feDisplacementMap
-/// - Micro-noise frosted grain overlay
+/// High-performance custom painter for specular shines, borders, and caustic highlights
 class _LiquidGlassPainter extends CustomPainter {
   final double borderRadius;
   final bool showNoise;
   final bool showCaustic;
   final bool showShine;
-
-  // Precomputed deterministic pseudo-random points for the frosted noise overlay
-  static final List<Offset> _noisePoints = List.generate(120, (i) {
-    final x = (math.sin(i * 12.9898 + 78.233) * 43758.5453).abs() % 1.0;
-    final y = (math.cos(i * 4.898 + 33.123) * 23421.631).abs() % 1.0;
-    return Offset(x, y);
-  });
 
   _LiquidGlassPainter({
     required this.borderRadius,
@@ -183,72 +172,50 @@ class _LiquidGlassPainter extends CustomPainter {
       final innerGlowPaint = Paint()
         ..shader = ui.Gradient.linear(
           Offset(size.width / 2, size.height),
-          Offset(size.width / 2, size.height - 35),
-          [
-            const Color(0x26FFFFFF), // 0.15 white
-            const Color(0x00FFFFFF),
+          Offset(size.width / 2, size.height - 30),
+          const [
+            Color(0x22FFFFFF),
+            Color(0x00FFFFFF),
           ],
         );
       canvas.drawRRect(rrect, innerGlowPaint);
     }
 
-    // 2. SVG feSpecularLighting & feDisplacementMap caustic refraction:
-    // Light source at (-200, -200, 300) creates a subtle diagonal refraction sheen across the glass
+    // 2. Caustic refraction sheen across the glass
     if (showCaustic) {
       final causticPaint = Paint()
         ..shader = ui.Gradient.linear(
-          Offset(-size.width * 0.2, -size.height * 0.2),
-          Offset(size.width * 0.9, size.height * 1.1),
+          Offset(-size.width * 0.1, -size.height * 0.1),
+          Offset(size.width * 0.9, size.height * 1.0),
           [
-            Colors.white.withValues(alpha: 0.09),
-            const Color(0xFF00E5FF).withValues(alpha: 0.04), // Subtle chromatic cyan edge
+            Colors.white.withValues(alpha: 0.08),
+            const Color(0xFF00E5FF).withValues(alpha: 0.03),
             Colors.transparent,
-            const Color(0xFFA855F7).withValues(alpha: 0.03), // Subtle chromatic violet edge
-            Colors.white.withValues(alpha: 0.05),
+            Colors.white.withValues(alpha: 0.04),
           ],
-          [0.0, 0.25, 0.55, 0.8, 1.0],
+          const [0.0, 0.25, 0.65, 1.0],
         );
       canvas.drawRRect(rrect, causticPaint);
     }
 
-    // 3. Frosted noise texture: .glass-noise opacity 0.07
-    if (showNoise) {
-      final noisePaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.06)
-        ..strokeWidth = 1.0
-        ..strokeCap = StrokeCap.round;
-
-      for (final pt in _noisePoints) {
-        final px = pt.dx * size.width;
-        final py = pt.dy * size.height;
-        canvas.drawPoints(ui.PointMode.points, [Offset(px, py)], noisePaint);
-      }
-    }
-
-    // 4. Subtle Base Rim Border:
-    // border-top: 0.7px solid rgba(255, 255, 255, 0.356)
-    // border-bottom: 0.1px solid rgba(255, 255, 255, 0.3)
-    // border-left/right: 0.2-0.3 rgba(255, 255, 255)
+    // 3. Base Rim Border:
     final rimPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.85
       ..shader = ui.Gradient.linear(
         Offset(size.width / 2, 0),
         Offset(size.width / 2, size.height),
-        [
-          const Color(0x5EFFFFFF), // 0.37 white at top
-          const Color(0x28FFFFFF), // 0.16 white at mid
-          const Color(0x40FFFFFF), // 0.25 white at bottom
+        const [
+          Color(0x55FFFFFF), // top border
+          Color(0x22FFFFFF),
+          Color(0x35FFFFFF), // bottom border
         ],
-        [0.0, 0.5, 1.0],
+        const [0.0, 0.5, 1.0],
       );
     canvas.drawRRect(rrect, rimPaint);
 
-    // 5. Specular Corner Highlights:
-    // .liquidGlass-shine::before (Top-Left corner highlight)
-    // border-top: 1.2px solid #fff, border-left: 2px solid #fff
-    // radial-gradient fading from (0,0) outward to 20px
-    final cornerHighlightLength = math.min(r * 1.5, 55.0);
+    // 4. Specular Corner Highlights:
+    final cornerHighlightLength = math.min(r * 1.4, 48.0);
 
     // Top-Left Arc Highlight
     final tlPath = Path()
@@ -259,24 +226,21 @@ class _LiquidGlassPainter extends CustomPainter {
 
     final tlPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8
+      ..strokeWidth = 1.6
       ..strokeCap = StrokeCap.round
       ..shader = ui.Gradient.radial(
         Offset.zero,
         cornerHighlightLength,
-        [
-          const Color(0xF5FFFFFF), // crisp white highlight
-          const Color(0x80FFFFFF),
-          const Color(0x00FFFFFF), // fades out outward
+        const [
+          Color(0xF0FFFFFF),
+          Color(0x70FFFFFF),
+          Color(0x00FFFFFF),
         ],
-        [0.0, 0.35, 1.0],
+        const [0.0, 0.35, 1.0],
       );
     canvas.drawPath(tlPath, tlPaint);
 
     // Bottom-Right Arc Highlight
-    // .liquidGlass-shine::after (Bottom-Right corner highlight)
-    // border-bottom: 1.5px solid #fff, border-right: 1.5px solid #fff
-    // Sweeps clockwise along the outer rounded corner from right edge to bottom edge
     final brPath = Path()
       ..moveTo(size.width, size.height - cornerHighlightLength)
       ..lineTo(size.width, size.height - r)
@@ -289,17 +253,17 @@ class _LiquidGlassPainter extends CustomPainter {
 
     final brPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
+      ..strokeWidth = 1.4
       ..strokeCap = StrokeCap.round
       ..shader = ui.Gradient.radial(
         Offset(size.width, size.height),
         cornerHighlightLength,
-        [
-          const Color(0xE8FFFFFF),
-          const Color(0x70FFFFFF),
-          const Color(0x00FFFFFF),
+        const [
+          Color(0xE0FFFFFF),
+          Color(0x60FFFFFF),
+          Color(0x00FFFFFF),
         ],
-        [0.0, 0.35, 1.0],
+        const [0.0, 0.35, 1.0],
       );
     canvas.drawPath(brPath, brPaint);
   }
