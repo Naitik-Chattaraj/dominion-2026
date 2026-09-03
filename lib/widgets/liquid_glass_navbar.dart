@@ -140,9 +140,9 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                 children: [
                   LiquidGlassContainer(
                     borderRadius: 50.0,
-                    blurSigma: 10.0, // Tuned for high FPS on mobile/AVD
-                    tintOpacity: 0.38,
-                    tintColor: const Color(0xFF14011F),
+                    blurSigma: 1.8, // Minimal blur for high transparency glass
+                    tintOpacity: 0.18, // High transparency
+                    tintColor: const Color(0xFF0C0212),
                     enableBlur: true,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16.0,

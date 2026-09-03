@@ -23,12 +23,28 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _checkInitialMode();
+  }
+  
+  Future<void> _checkInitialMode() async {
+    final hasAccount = await _localAuthService.hasAnyAccount();
+    if (mounted) {
+      setState(() {
+        _isCreateAccountMode = !hasAccount;
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
+
 
   void _submit() async {
     HapticFeedback.mediumImpact();

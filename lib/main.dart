@@ -5,7 +5,11 @@ import 'theme/app_theme.dart';
 import 'widgets/liquid_glass_navbar.dart';
 import 'screens/auth/sign_in_screen.dart';
 import 'screens/home/riskgrid_home_screen.dart';
+import 'screens/home/safety_map_screen.dart';
+import 'screens/news/news_feed_screen.dart';
+import 'screens/profile/profile_screen.dart';
 import 'services/local_auth_service.dart';
+import 'services/safety_location_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +57,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkLoginStatus() async {
-    final shouldLogin = await _localAuthService.shouldAutoLogin();
+    bool shouldLogin = await _localAuthService.shouldAutoLogin();
+    
+    // If not auto-login (stay signed in false), check if biometrics can save us
+    if (!shouldLogin) {
+      final lastUser = await _localAuthService.getLastStoredUser();
+      if (lastUser != null && lastUser.biometricEnabled) {
+         shouldLogin = await _localAuthService.signInWithBiometrics();
+      }
+    }
+
     if (mounted) {
       setState(() {
         _isLoggedIn = shouldLogin;
@@ -99,6 +112,12 @@ class MainShellScreen extends StatefulWidget {
 class MainShellScreenState extends State<MainShellScreen> {
   int _currentIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    SafetyLocationService.instance.init();
+  }
+
   final List<DockItem> _dockItems = const [
     DockItem(
       icon: CupertinoIcons.house_fill,
@@ -113,9 +132,9 @@ class MainShellScreenState extends State<MainShellScreen> {
       activeColor: Color(0xFF00E5FF),
     ),
     DockItem(
-      icon: CupertinoIcons.gear,
-      activeIcon: CupertinoIcons.gear_solid,
-      label: 'Settings',
+      icon: CupertinoIcons.news,
+      activeIcon: CupertinoIcons.news_solid,
+      label: 'News',
       activeColor: Color(0xFFA855F7),
     ),
     DockItem(
@@ -142,47 +161,16 @@ class MainShellScreenState extends State<MainShellScreen> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      const RiskGridHomeScreen(),
-      const Center(
-        child: Text(
-          'Safe Route / Explore',
-          style: TextStyle(color: Colors.white, fontFamily: 'Inter'),
-        ),
+      RiskGridHomeScreen(
+        onNavigate: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
       ),
-      const Center(
-        child: Text(
-          'Settings & Sensors',
-          style: TextStyle(color: Colors.white, fontFamily: 'Inter'),
-        ),
-      ),
-      Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Profile',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: logout,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8A1E4A),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              child: const Text('Sign Out', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
+      const SafetyMapScreen(),
+      const NewsFeedScreen(),
+      const ProfileScreen(),
     ];
 
     return Scaffold(
