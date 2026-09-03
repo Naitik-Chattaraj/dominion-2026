@@ -146,12 +146,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
             value: _user!.biometricEnabled,
             onChanged: (val) async {
               HapticFeedback.selectionClick();
+              final messenger = ScaffoldMessenger.of(context);
+              if (val) {
+                final result = await _authService.verifyBiometricsToEnable();
+                if (!result.isSuccess) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(result.message),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+              }
               await _authService.updateBiometricPreference(val);
+              if (!mounted) return;
               setState(() => _user = LocalUser(
                 uid: _user!.uid, name: _user!.name, email: _user!.email, passwordHash: _user!.passwordHash,
                 publicUid: _user!.publicUid, pairingCode: _user!.pairingCode,
                 biometricEnabled: val, staySignedIn: _user!.staySignedIn,
               ));
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(val ? 'Biometric login enabled.' : 'Biometric login disabled.'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
             },
           ),
           

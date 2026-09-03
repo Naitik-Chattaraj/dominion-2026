@@ -63,7 +63,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (!shouldLogin) {
       final lastUser = await _localAuthService.getLastStoredUser();
       if (lastUser != null && lastUser.biometricEnabled) {
-         shouldLogin = await _localAuthService.signInWithBiometrics();
+         final result = await _localAuthService.signInWithBiometrics();
+         shouldLogin = result.isSuccess;
       }
     }
 

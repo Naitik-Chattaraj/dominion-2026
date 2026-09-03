@@ -291,7 +291,7 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _LegendDot(color: Color(0xFF7C4DFF), label: 'AI Risk'),
+                            _LegendDot(color: Color(0xFF7C4DFF), label: 'Predicted Risk'),
                             SizedBox(width: 8),
                             _LegendDot(color: Color(0xFFFFB800), label: 'Suspicion'),
                             SizedBox(width: 8),

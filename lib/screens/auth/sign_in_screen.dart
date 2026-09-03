@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../services/local_auth_service.dart';
 import '../../widgets/liquid_glass_container.dart';
 import '../../widgets/liquid_glass_text_field.dart';
+import '../../utils/app_haptics.dart';
 
 class SignInScreen extends StatefulWidget {
   final VoidCallback onSignInSuccess;
@@ -21,6 +22,8 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _isCreateAccountMode = true;
   bool _staySignedIn = true;
   bool _obscurePassword = true;
+  bool _biometricsAvailable = false;
+  bool _isAuthenticatingBiometric = false;
 
   @override
   void initState() {
@@ -30,10 +33,50 @@ class _SignInScreenState extends State<SignInScreen> {
   
   Future<void> _checkInitialMode() async {
     final hasAccount = await _localAuthService.hasAnyAccount();
+    final isHardwareAvailable = await _localAuthService.isBiometricHardwareAvailable();
+    final lastUser = await _localAuthService.getLastStoredUser();
+
     if (mounted) {
       setState(() {
         _isCreateAccountMode = !hasAccount;
+        _biometricsAvailable = isHardwareAvailable && hasAccount;
+        if (lastUser != null) {
+          _emailController.text = lastUser.email;
+        }
       });
+
+      if (hasAccount && (lastUser?.biometricEnabled ?? false)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _signInWithBiometrics(autoTriggered: true);
+        });
+      }
+    }
+  }
+
+  void _signInWithBiometrics({bool autoTriggered = false}) async {
+    if (_isAuthenticatingBiometric) return;
+    setState(() => _isAuthenticatingBiometric = true);
+
+    final result = await _localAuthService.signInWithBiometrics();
+    if (mounted) {
+      setState(() => _isAuthenticatingBiometric = false);
+    }
+
+    if (result.isSuccess) {
+      await AppHaptics.flagSuspicion();
+      widget.onSignInSuccess();
+    } else {
+      if (!autoTriggered || !result.message.toLowerCase().contains('cancel')) {
+        await AppHaptics.flagDanger();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -297,6 +340,50 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                       ),
                     ),
+
+                    // Biometric Sign In Button (if account exists and device supports biometrics)
+                    if (!_isCreateAccountMode && _biometricsAvailable) ...[
+                      const SizedBox(height: 14),
+                      LiquidGlassContainer(
+                        onTap: _isAuthenticatingBiometric ? null : () => _signInWithBiometrics(autoTriggered: false),
+                        borderRadius: 14,
+                        tintColor: const Color(0xFF261022),
+                        tintOpacity: 0.85,
+                        blurSigma: 12.0,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        child: Center(
+                          child: _isAuthenticatingBiometric
+                              ? const SizedBox(
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFFD9779F),
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.fingerprint_rounded,
+                                      color: Color(0xFFD9779F),
+                                      size: 24,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Sign in with Biometrics',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16.5,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
 
                     // Divider: "or"

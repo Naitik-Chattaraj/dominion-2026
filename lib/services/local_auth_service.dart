@@ -1,10 +1,24 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:riskgrid/database/riskgrid_database.dart';
 import 'package:riskgrid/models/local_user.dart';
+
+class BiometricAuthResult {
+  final bool isSuccess;
+  final String message;
+
+  BiometricAuthResult({required this.isSuccess, required this.message});
+
+  factory BiometricAuthResult.success() =>
+      BiometricAuthResult(isSuccess: true, message: 'Authentication successful');
+
+  factory BiometricAuthResult.error(String message) =>
+      BiometricAuthResult(isSuccess: false, message: message);
+}
 
 class LocalAuthService {
   final RiskGridDatabase _db = RiskGridDatabase.instance;
@@ -99,21 +113,64 @@ class LocalAuthService {
     return false;
   }
 
-  Future<bool> signInWithBiometrics() async {
+  Future<bool> isBiometricHardwareAvailable() async {
     try {
-      final user = await getLastStoredUser();
-      if (user == null || !user.biometricEnabled) return false;
+      final isSupported = await _localAuth.isDeviceSupported();
+      final canCheck = await _localAuth.canCheckBiometrics;
+      return isSupported || canCheck;
+    } catch (_) {
+      return false;
+    }
+  }
 
-      final bool canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
-      final bool canAuthenticate = canAuthenticateWithBiometrics || await _localAuth.isDeviceSupported();
+  Future<BiometricAuthResult> verifyBiometricsToEnable() async {
+    try {
+      final canAuthenticate = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
+      if (!canAuthenticate) {
+        return BiometricAuthResult.error('Biometrics and lock screen security are not supported on this device.');
+      }
 
-      if (!canAuthenticate) return false;
-
-      final bool didAuthenticate = await _localAuth.authenticate(
-        localizedReason: 'Authenticate to access RiskGrid',
+      final didAuthenticate = await _localAuth.authenticate(
+        localizedReason: 'Confirm identity to enable Biometric Login',
         options: const AuthenticationOptions(
           stickyAuth: true,
-          biometricOnly: false, // Allows fallback to PIN
+          biometricOnly: false,
+        ),
+      );
+
+      if (didAuthenticate) {
+        return BiometricAuthResult.success();
+      } else {
+        return BiometricAuthResult.error('Verification canceled.');
+      }
+    } on PlatformException catch (e) {
+      if (e.code == 'NotEnrolled') {
+        return BiometricAuthResult.error(
+            'No fingerprint or device screen lock enrolled. Please set up a screen lock/fingerprint in Android Settings.');
+      }
+      return BiometricAuthResult.error(e.message ?? 'Verification failed.');
+    } catch (e) {
+      return BiometricAuthResult.error('Error verifying identity: $e');
+    }
+  }
+
+  Future<BiometricAuthResult> signInWithBiometrics() async {
+    try {
+      final user = await getLastStoredUser();
+      if (user == null) {
+        return BiometricAuthResult.error('No account registered on this device.');
+      }
+
+      final canAuthenticate = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
+      if (!canAuthenticate) {
+        return BiometricAuthResult.error('Biometrics and lock screen security are not supported on this device.');
+      }
+
+      final didAuthenticate = await _localAuth.authenticate(
+        localizedReason: 'Confirm your identity to sign in to RiskGrid',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: false,
         ),
       );
 
@@ -121,10 +178,20 @@ class LocalAuthService {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_keyLastUserUid, user.uid);
         await prefs.setBool(_keyIsLoggedIn, true);
+        return BiometricAuthResult.success();
+      } else {
+        return BiometricAuthResult.error('Authentication canceled.');
       }
-      return didAuthenticate;
+    } on PlatformException catch (e) {
+      if (e.code == 'NotEnrolled') {
+        return BiometricAuthResult.error(
+            'No fingerprint enrolled in device settings. Please set up a fingerprint in Android Settings or use password.');
+      } else if (e.code == 'LockedOut' || e.code == 'PermanentlyLockedOut') {
+        return BiometricAuthResult.error('Biometrics locked due to too many attempts. Please use password.');
+      }
+      return BiometricAuthResult.error(e.message ?? 'Biometric authentication failed.');
     } catch (e) {
-      return false;
+      return BiometricAuthResult.error('Authentication failed: $e');
     }
   }
 
