@@ -52,6 +52,8 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
   late int _targetIndex;
   late AnimationController _gooeyController;
 
+  bool _hasTriggeredSnapHaptic = false;
+
   static const double kSlotWidth = 72.0;
 
   @override
@@ -64,6 +66,25 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
       vsync: this,
       duration: const Duration(milliseconds: 520),
     );
+
+    // Dynamic Multi-Stage Tactile Slime Feedback:
+    // 1. Initial touch: lightImpact on tap
+    // 2. Liquid bridge snap: selectionClick exactly when the neck pinches and snaps at progress 0.58
+    // 3. Fluid settle: subtle selectionClick when the jelly finishes its harmonic oscillation
+    _gooeyController.addListener(() {
+      if (!_hasTriggeredSnapHaptic && _gooeyController.value >= 0.58) {
+        _hasTriggeredSnapHaptic = true;
+        HapticFeedback.selectionClick();
+      }
+    });
+
+    _gooeyController.addStatusListener((status) {
+      if (status == AnimationStatus.forward) {
+        _hasTriggeredSnapHaptic = false;
+      } else if (status == AnimationStatus.completed) {
+        HapticFeedback.selectionClick();
+      }
+    });
   }
 
   @override

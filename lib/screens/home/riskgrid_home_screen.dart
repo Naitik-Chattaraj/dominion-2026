@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/safety_models.dart';
 import '../../widgets/liquid_glass_container.dart';
 
@@ -72,11 +73,26 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
   }
 
   void _cycleStatus() {
+    final nextStatus = SafetyStatus.values[
+      (_currentStatus.index + 1) % SafetyStatus.values.length
+    ];
+
+    // Differentiated haptic feedback tailored to the danger severity of the status:
+    switch (nextStatus) {
+      case SafetyStatus.allGood:
+        HapticFeedback.lightImpact(); // Calm, gentle confirmation
+        break;
+      case SafetyStatus.staySafe:
+        HapticFeedback.mediumImpact(); // Notable advisory bump
+        break;
+      case SafetyStatus.riskyArea:
+        HapticFeedback.heavyImpact(); // Urgent, strong warning alert
+        break;
+    }
+
     setState(() {
       _prevStatus = _currentStatus;
-      _currentStatus = SafetyStatus.values[
-        (_currentStatus.index + 1) % SafetyStatus.values.length
-      ];
+      _currentStatus = nextStatus;
     });
     _flowController.forward(from: 0.0);
   }
@@ -148,6 +164,16 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                       ),
 
                       LiquidGlassContainer(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('No new alerts in your current grid zone'),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
                         borderRadius: 22.0,
                         blurSigma: 10.0,
                         tintOpacity: 0.42,
@@ -221,6 +247,16 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
 
                   // "Nearby Risky Locations" Liquid Glass Card (Enlarged 1.15x to 236px Height)
                   LiquidGlassContainer(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Viewing risk telemetry for Potheri & Maramalai Nagar'),
+                          duration: Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
                     borderRadius: 24,
                     tintColor: const Color(0xFF14081B),
                     tintOpacity: 0.65,
@@ -329,6 +365,16 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                       itemBuilder: (context, index) {
                         final incident = _incidents[index];
                         return LiquidGlassContainer(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Opening report: ${incident.title}'),
+                                duration: const Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
                           borderRadius: 20,
                           tintColor: const Color(0xFF14081B),
                           tintOpacity: 0.65,

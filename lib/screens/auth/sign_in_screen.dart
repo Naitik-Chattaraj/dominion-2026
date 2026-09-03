@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/local_auth_service.dart';
 import '../../widgets/liquid_glass_container.dart';
 import '../../widgets/liquid_glass_text_field.dart';
@@ -30,10 +31,12 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   void _submit() async {
+    HapticFeedback.mediumImpact();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
+      HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields')),
       );
@@ -43,6 +46,7 @@ class _SignInScreenState extends State<SignInScreen> {
     if (_isCreateAccountMode) {
       final name = _nameController.text.trim();
       if (name.isEmpty) {
+        HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please enter your name')),
         );
@@ -54,6 +58,7 @@ class _SignInScreenState extends State<SignInScreen> {
         password: password,
         staySignedIn: _staySignedIn,
       );
+      HapticFeedback.lightImpact();
       widget.onSignInSuccess();
     } else {
       final success = await _localAuthService.signIn(
@@ -62,8 +67,10 @@ class _SignInScreenState extends State<SignInScreen> {
         staySignedIn: _staySignedIn,
       );
       if (success) {
+        HapticFeedback.lightImpact();
         widget.onSignInSuccess();
       } else {
+        HapticFeedback.heavyImpact();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Invalid email or password')),
@@ -230,6 +237,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           child: Checkbox(
                             value: _staySignedIn,
                             onChanged: (val) {
+                              HapticFeedback.selectionClick();
                               setState(() {
                                 _staySignedIn = val ?? true;
                               });
@@ -299,6 +307,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     Center(
                       child: GestureDetector(
                         onTap: () {
+                          HapticFeedback.selectionClick();
                           setState(() {
                             _isCreateAccountMode = !_isCreateAccountMode;
                           });

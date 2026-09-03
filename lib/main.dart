@@ -127,6 +127,7 @@ class MainShellScreenState extends State<MainShellScreen> {
   ];
 
   void logout() async {
+    HapticFeedback.mediumImpact();
     await LocalAuthService().signOut();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
