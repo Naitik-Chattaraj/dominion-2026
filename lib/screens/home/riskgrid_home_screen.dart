@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -29,6 +31,7 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
   late Animation<double> _flowAnimation;
 
   late Future<List<NewsArticle>> _newsFuture;
+  final MapController _miniMapController = MapController();
 
   @override
   void initState() {
@@ -53,13 +56,24 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
 
     // Live reactive binding to GPS proximity engine
     SafetyLocationService.instance.statusNotifier.addListener(_onStatusChanged);
+    SafetyLocationService.instance.locationNotifier.addListener(_onLocationChanged);
   }
 
   @override
   void dispose() {
     SafetyLocationService.instance.statusNotifier.removeListener(_onStatusChanged);
+    SafetyLocationService.instance.locationNotifier.removeListener(_onLocationChanged);
     _flowController.dispose();
     super.dispose();
+  }
+
+  void _onLocationChanged() {
+    final userLoc = SafetyLocationService.instance.locationNotifier.value;
+    if (userLoc != null && mounted) {
+      try {
+        _miniMapController.move(userLoc, 14.5);
+      } catch (_) {}
+    }
   }
 
   void _onStatusChanged() {
@@ -134,11 +148,11 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
             bottom: false,
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              padding: EdgeInsets.symmetric(horizontal: 20.0.w),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8.h),
 
                   // Top Header Row: Shield Logo (left) and Liquid Glass Notification Bell (right)
                   Row(
@@ -148,13 +162,13 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                         children: [
                           Image.asset(
                             'assets/riskgrid.png',
-                            height: 38,
+                            height: 32.h,
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
+                              return Icon(
                                 Icons.shield,
                                 color: Color(0xFFD9779F),
-                                size: 34,
+                                size: 30,
                               );
                             },
                           ),
@@ -172,27 +186,27 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                             ),
                           );
                         },
-                        borderRadius: 22.0,
+                        borderRadius: 18.0,
                         blurSigma: 5.0, // Reduced by 50%
                         tintOpacity: 0.42,
                         tintColor: const Color(0xFF16091E),
-                        padding: const EdgeInsets.all(10.0),
+                        padding: EdgeInsets.all(8.0.r),
                         enableBlur: true,
-                        child: const Icon(
+                        child: Icon(
                           Icons.notifications_none_rounded,
                           color: Colors.white,
-                          size: 24.0,
+                          size: 20.0,
                         ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                  SizedBox(height: 18.h),
 
                   // Display Title with STRICT FIXED HEIGHT CONTAINER
                   // Prevents the layout from shifting or pushing upwards when switching to "Risky Area"
                   SizedBox(
-                    height: 70.0,
+                    height: 58.0.h,
                     width: double.infinity,
                     child: Center(
                       child: AnimatedSwitcher(
@@ -211,15 +225,15 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                           key: ValueKey(_currentStatus),
                           fit: BoxFit.scaleDown,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                            padding: EdgeInsets.symmetric(horizontal: 10.0.w),
                             child: Text(
                               _currentStatus.displayTitle,
                               textAlign: TextAlign.center,
                               maxLines: 1,
                               softWrap: false,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'WinterSolace',
-                                fontSize: 52.0,
+                                fontSize: 44.0.sp,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFFD9779F),
                                 letterSpacing: 0.5,
@@ -237,16 +251,18 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  SizedBox(height: 18.h),
 
-                  // "RiskGrid Map" Liquid Glass Card (Enlarged 1.15x to 236px Height)
+                  // "RiskGrid Map" Liquid Glass Card (Scaled down ~15%)
                   ValueListenableBuilder<LatLng?>(
                     valueListenable: SafetyLocationService.instance.locationNotifier,
                     builder: (context, userLoc, _) {
                       return ValueListenableBuilder<List<DangerZone>>(
                         valueListenable: SafetyLocationService.instance.zonesNotifier,
                         builder: (context, zones, _) {
-                          final center = userLoc ?? const LatLng(12.8235, 80.0442);
+                          final center = userLoc ??
+                              SafetyLocationService.instance.locationNotifier.value ??
+                              const LatLng(37.4219999, -122.0840575);
 
                           return LiquidGlassContainer(
                             onTap: () {
@@ -255,25 +271,26 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                                 widget.onNavigate!(1); // Navigate to index 1 (Explore/Map)
                               }
                             },
-                            borderRadius: 24,
+                            borderRadius: 20,
                             tintColor: const Color(0xFF14081B),
                             tintOpacity: 0.65,
                             enableBlur: false,
                             padding: EdgeInsets.zero,
                             child: SizedBox(
-                              height: 236, // 205 * 1.15 = 235.75
+                              height: 198.h,
                               width: double.infinity,
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(24),
+                                borderRadius: BorderRadius.circular(20.r),
                                 child: Stack(
                                   children: [
                                     Positioned(
                                       right: 0,
                                       top: 0,
                                       bottom: 0,
-                                      left: 175,
+                                      left: 145.w,
                                       child: IgnorePointer(
                                         child: FlutterMap(
+                                          mapController: _miniMapController,
                                           options: MapOptions(
                                             initialCenter: center,
                                             initialZoom: 14.5,
@@ -306,8 +323,8 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                                                 markers: [
                                                   Marker(
                                                     point: userLoc,
-                                                    width: 24,
-                                                    height: 24,
+                                                    width: 20.w,
+                                                    height: 20.h,
                                                     child: Container(
                                                       decoration: BoxDecoration(
                                                         shape: BoxShape.circle,
@@ -325,7 +342,7 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
 
                                     Positioned.fill(
                                       child: Container(
-                                        decoration: const BoxDecoration(
+                                        decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.centerLeft,
                                             end: Alignment.centerRight,
@@ -343,30 +360,30 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                                     ),
 
                                     Padding(
-                                      padding: const EdgeInsets.fromLTRB(26.0, 28.0, 20.0, 28.0),
+                                      padding: EdgeInsets.fromLTRB(20.0.w, 20.0.h, 16.0.w, 20.0.h),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          const Text(
+                                          Text(
                                             'RiskGrid\nMap',
                                             style: TextStyle(
                                               color: Colors.white,
-                                              fontSize: 26.0,
+                                              fontSize: 22.0.sp,
                                               fontWeight: FontWeight.w700,
-                                              height: 1.25,
+                                              height: 1.2.h,
                                               fontFamily: 'Inter',
                                             ),
                                           ),
-                                          const SizedBox(height: 24),
+                                          SizedBox(height: 16.h),
                                           Text(
                                             userLoc != null
                                                 ? '${zones.length} active risk zones\nGPS telemetry active'
                                                 : 'Live nearby risk\ntelemetry',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               color: Color(0xFF96909E),
-                                              fontSize: 14.5,
-                                              height: 1.3,
+                                              fontSize: 12.5.sp,
+                                              height: 1.25.h,
                                               fontFamily: 'Inter',
                                               fontWeight: FontWeight.w500,
                                             ),
@@ -384,7 +401,7 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                     },
                   ),
 
-                  const SizedBox(height: 32),
+                  SizedBox(height: 24.h),
 
                   // Section Header: "Happening Around You" (Interactive)
                   GestureDetector(
@@ -398,11 +415,11 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Happening Around You',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 20.0,
+                            fontSize: 17.5.sp,
                             fontWeight: FontWeight.w700,
                             fontFamily: 'Inter',
                           ),
@@ -413,16 +430,16 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                               'View all',
                               style: TextStyle(
                                 color: const Color(0xFFD9779F).withValues(alpha: 0.85),
-                                fontSize: 13.5,
+                                fontSize: 12.0.sp,
                                 fontWeight: FontWeight.w600,
                                 fontFamily: 'Inter',
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            const Icon(
+                            SizedBox(width: 3.w),
+                            Icon(
                               Icons.arrow_forward_ios_rounded,
                               color: Color(0xFFD9779F),
-                              size: 13,
+                              size: 11.5,
                             ),
                           ],
                         ),
@@ -430,21 +447,21 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  SizedBox(height: 12.h),
 
-                  // Incident Cards Horizontal Carousel (Enlarged to accommodate text)
+                  // Incident Cards Horizontal Carousel (Scaled down ~15%)
                   SizedBox(
-                    height: 340, 
+                    height: 298.h, 
                     child: FutureBuilder<List<NewsArticle>>(
                       future: _newsFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(
+                          return Center(
                             child: CircularProgressIndicator(color: Color(0xFFD9779F)),
                           );
                         }
                         if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const Center(
+                          return Center(
                             child: Text(
                               'No local updates at this moment.',
                               style: TextStyle(color: Color(0xFF908A99)),
@@ -458,32 +475,33 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                           scrollDirection: Axis.horizontal,
                           physics: const BouncingScrollPhysics(),
                           itemCount: articles.length,
-                          separatorBuilder: (context, index) => const SizedBox(width: 16),
+                          separatorBuilder: (context, index) => SizedBox(width: 14.w),
                           itemBuilder: (context, index) {
                             final article = articles[index];
                             return LiquidGlassContainer(
-                              onTap: () {
-                                AppHaptics.cardTap();
-                                if (widget.onNavigate != null) {
-                                  widget.onNavigate!(2); // Navigate to index 2 (News)
-                                }
-                              },
-                              borderRadius: 20,
+                                onTap: () async {
+                                  AppHaptics.cardTap();
+                                  final url = Uri.parse(article.link);
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                                  }
+                                },
+                              borderRadius: 18,
                               tintColor: const Color(0xFF14081B),
                               tintOpacity: 0.65,
                               enableBlur: false,
                               padding: EdgeInsets.zero,
                               child: SizedBox(
-                                width: 258, // 172 * 1.5 = 258.0
+                                width: 222.w,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     ClipRRect(
-                                      borderRadius: const BorderRadius.vertical(
-                                        top: Radius.circular(20),
+                                      borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(18.r),
                                       ),
                                       child: SizedBox(
-                                        height: 168,
+                                        height: 128.h,
                                         width: double.infinity,
                                         child: Image.network(
                                           article.thumbnail,
@@ -491,7 +509,7 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                                           errorBuilder: (context, error, stackTrace) {
                                             return Container(
                                               color: const Color(0xFF2C1638),
-                                              child: const Icon(
+                                              child: Icon(
                                                 CupertinoIcons.photo,
                                                 color: Colors.white30,
                                               ),
@@ -502,57 +520,73 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                                     ),
 
                                     Padding(
-                                      padding: const EdgeInsets.fromLTRB(16.0, 14.0, 16.0, 12.0),
+                                      padding: EdgeInsets.fromLTRB(12.0.w, 9.0.h, 12.0.w, 9.0.h),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
+                                          // Category & Source badges
                                           Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Row(
-                                                children: [
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                                    margin: const EdgeInsets.only(right: 8),
-                                                    decoration: BoxDecoration(
-                                                      color: _getCategoryColor(article.category).withValues(alpha: 0.2),
-                                                      borderRadius: BorderRadius.circular(4),
-                                                      border: Border.all(color: _getCategoryColor(article.category).withValues(alpha: 0.5)),
-                                                    ),
-                                                    child: Text(
-                                                      article.category.name.toUpperCase(),
-                                                      style: TextStyle(
-                                                        color: _getCategoryColor(article.category),
-                                                        fontSize: 9,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    ),
+                                              Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.5.h),
+                                                margin: EdgeInsets.only(right: 6.w),
+                                                decoration: BoxDecoration(
+                                                  color: _getCategoryColor(article.category).withValues(alpha: 0.2),
+                                                  borderRadius: BorderRadius.circular(4.r),
+                                                  border: Border.all(color: _getCategoryColor(article.category).withValues(alpha: 0.5)),
+                                                ),
+                                                child: Text(
+                                                  article.category.name.toUpperCase(),
+                                                  style: TextStyle(
+                                                    color: _getCategoryColor(article.category),
+                                                    fontSize: 8.sp,
+                                                    fontWeight: FontWeight.bold,
                                                   ),
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFF251C2B),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                    ),
-                                                    child: Text(
-                                                      article.sourceName.toUpperCase(),
-                                                      style: const TextStyle(
-                                                        color: Color(0xFF9871BA),
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
-                                                        letterSpacing: 0.5,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
+                                                ),
                                               ),
                                               Flexible(
+                                                child: Container(
+                                                  padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 3.h),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF251C2B),
+                                                    borderRadius: BorderRadius.circular(5.r),
+                                                  ),
+                                                  child: Text(
+                                                    article.sourceName.toUpperCase(),
+                                                    style: TextStyle(
+                                                      color: Color(0xFF9871BA),
+                                                      fontSize: 8.5.sp,
+                                                      fontWeight: FontWeight.bold,
+                                                      letterSpacing: 0.4,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 5.h),
+
+                                          // Location Tag on a NEWLINE
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.location_on_rounded,
+                                                size: 11.sp,
+                                                color: const Color(0xFF8E8299),
+                                              ),
+                                              SizedBox(width: 3.w),
+                                              Expanded(
                                                 child: Text(
-                                                  'Chennai', 
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF6F667A),
-                                                    fontSize: 11.0,
+                                                  NewsService.instance.lastResolvedCity.isNotEmpty
+                                                      ? NewsService.instance.lastResolvedCity
+                                                      : 'Local Area',
+                                                  style: TextStyle(
+                                                    color: const Color(0xFF8E8299),
+                                                    fontSize: 9.5.sp,
                                                     fontFamily: 'Inter',
+                                                    fontWeight: FontWeight.w500,
                                                   ),
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
@@ -560,26 +594,26 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 8),
+                                          SizedBox(height: 5.h),
                                           Text(
                                             article.title,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               color: Colors.white,
-                                              fontSize: 15.5,
+                                              fontSize: 13.5.sp,
                                               fontWeight: FontWeight.w600,
                                               fontFamily: 'Inter',
-                                              height: 1.25,
+                                              height: 1.22.h,
                                             ),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                          const SizedBox(height: 6),
+                                          SizedBox(height: 4.h),
                                           if (article.description.isNotEmpty)
                                             Text(
                                               article.description.replaceAll(RegExp(r'<[^>]*>'), ''),
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 color: Color(0xFF908A99),
-                                                fontSize: 12.5,
+                                                fontSize: 11.0.sp,
                                                 fontFamily: 'Inter',
                                               ),
                                               maxLines: 2,
@@ -598,7 +632,7 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 130),
+                  SizedBox(height: 135.h),
                 ],
               ),
             ),
@@ -663,8 +697,8 @@ class OrganicAmbientPainter extends CustomPainter {
       leftRect,
       Paint()
         ..shader = LinearGradient(
-          begin: const Alignment(-0.85, -1.0),
-          end: const Alignment(0.40, 1.0),
+          begin: Alignment(-0.85, -1.0),
+          end: Alignment(0.40, 1.0),
           colors: [
             currentColor.withValues(alpha: 0.35),
             currentColor.withValues(alpha: 0.18),
@@ -681,8 +715,8 @@ class OrganicAmbientPainter extends CustomPainter {
       rightRect,
       Paint()
         ..shader = LinearGradient(
-          begin: const Alignment(0.85, -1.0),
-          end: const Alignment(-0.35, 1.0),
+          begin: Alignment(0.85, -1.0),
+          end: Alignment(-0.35, 1.0),
           colors: [
             currentColor.withValues(alpha: 0.28),
             currentColor.withValues(alpha: 0.14),
@@ -699,7 +733,7 @@ class OrganicAmbientPainter extends CustomPainter {
       centerRect,
       Paint()
         ..shader = RadialGradient(
-          center: const Alignment(0.0, -0.85),
+          center: Alignment(0.0, -0.85),
           radius: 1.25,
           colors: [
             currentColor.withValues(alpha: 0.30),

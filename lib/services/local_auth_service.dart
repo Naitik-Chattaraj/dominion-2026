@@ -131,7 +131,7 @@ class LocalAuthService {
       }
 
       final didAuthenticate = await _localAuth.authenticate(
-        localizedReason: 'Confirm identity to enable Biometric Login',
+        localizedReason: 'RiskGrid needs your biometric identification for privacy and data protection.',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: false,
@@ -167,7 +167,7 @@ class LocalAuthService {
       }
 
       final didAuthenticate = await _localAuth.authenticate(
-        localizedReason: 'Confirm your identity to sign in to RiskGrid',
+        localizedReason: 'RiskGrid needs your biometric identification for privacy and data protection.',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: false,

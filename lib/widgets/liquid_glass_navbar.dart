@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
 import 'liquid_glass_container.dart';
 
@@ -54,7 +55,7 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
 
   bool _hasTriggeredSnapHaptic = false;
 
-  static const double kSlotWidth = 72.0;
+  static const double kSlotWidth = 64.0;
 
   @override
   void initState() {
@@ -144,13 +145,13 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                     tintOpacity: 0.18, // High transparency
                     tintColor: const Color(0xFF0C0212),
                     enableBlur: true,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.0,
+                      vertical: 5.0,
                     ),
                     child: SizedBox(
                       width: totalRowWidth,
-                      height: 58.0,
+                      height: 48.0.h,
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -163,7 +164,7 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                                   : 1.0;
 
                               return CustomPaint(
-                                size: Size(totalRowWidth, 58.0),
+                                size: Size(totalRowWidth, 48.0),
                                 painter: GooeySlimePainter(
                                   fromIndex: _prevIndex,
                                   toIndex: _targetIndex,
@@ -197,7 +198,7 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                   // Mac-style Floating Tooltip above hovered item
                   if (_hoveredIndex != null && _hoveredIndex! < widget.items.length)
                     Positioned(
-                      top: -42.0,
+                      top: -36.0,
                       child: _buildMacTooltip(widget.items[_hoveredIndex!].label),
                     ),
                 ],
@@ -218,7 +219,7 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
 
     return SizedBox(
       width: kSlotWidth,
-      height: 58.0,
+      height: 48.0.h,
       child: MouseRegion(
         onEnter: (_) => setState(() => _hoveredIndex = index),
         onExit: (_) => setState(() {
@@ -238,7 +239,7 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                 children: [
                   Icon(
                     isSelected ? (item.activeIcon ?? item.icon) : item.icon,
-                    size: 26.0,
+                    size: 22.0,
                     color: isSelected
                         ? Colors.white
                         : Colors.white.withValues(alpha: 0.65),
@@ -262,13 +263,13 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                       top: -6,
                       right: -8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
+                        padding: EdgeInsets.symmetric(
                           horizontal: 5.0,
                           vertical: 1.5,
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF2A6D),
-                          borderRadius: BorderRadius.circular(10.0),
+                          borderRadius: BorderRadius.circular(10.0.r),
                           boxShadow: [
                             BoxShadow(
                               color: const Color(0xFFFF2A6D).withValues(alpha: 0.5),
@@ -278,16 +279,16 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                           ],
                           border: Border.all(
                             color: Colors.white.withValues(alpha: 0.7),
-                            width: 0.8,
+                            width: 0.8.w,
                           ),
                         ),
                         child: Text(
                           item.badgeCount! > 99 ? '99+' : '${item.badgeCount}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 9.0,
+                            fontSize: 9.0.sp,
                             fontWeight: FontWeight.bold,
-                            height: 1.0,
+                            height: 1.0.h,
                           ),
                         ),
                       ),
@@ -303,13 +304,13 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
 
   Widget _buildMacTooltip(String title) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+      padding: EdgeInsets.symmetric(horizontal: 10.0.w, vertical: 4.0.h),
       decoration: BoxDecoration(
         color: const Color(0xFF1B142B).withValues(alpha: 0.90),
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: BorderRadius.circular(18.0.r),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.22),
-          width: 0.8,
+          width: 0.8.w,
         ),
         boxShadow: [
           BoxShadow(
@@ -321,9 +322,9 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
       ),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
-          fontSize: 11.5,
+          fontSize: 11.5.sp,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.2,
         ),
@@ -350,7 +351,7 @@ class GooeySlimePainter extends CustomPainter {
     required this.toColor,
   });
 
-  static const double kBaseRadius = 24.0;
+  static const double kBaseRadius = 19.0;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -363,7 +364,7 @@ class GooeySlimePainter extends CustomPainter {
     // Static Idle State: Render glowing droplet and indicator dot
     if (fromIndex == toIndex || progress >= 1.0) {
       _drawSingleDroplet(canvas, Offset(toX, centerY), kBaseRadius, 1.0, 1.0, currentColor);
-      _drawIndicatorDot(canvas, toX, size.height - 4.0, currentColor);
+      _drawIndicatorDot(canvas, toX, size.height - 3.0, currentColor);
       return;
     }
 
@@ -486,7 +487,7 @@ class GooeySlimePainter extends CustomPainter {
       rect,
       Paint()
         ..shader = RadialGradient(
-          center: const Alignment(0.0, -0.4),
+          center: Alignment(0.0, -0.4),
           radius: 0.9,
           colors: [
             Colors.white.withValues(alpha: 0.45),

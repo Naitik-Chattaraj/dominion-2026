@@ -4,6 +4,10 @@ import 'package:riskgrid/services/local_auth_service.dart';
 import 'package:riskgrid/models/local_user.dart';
 import 'package:riskgrid/main.dart'; // For AuthWrapper routing
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:riskgrid/database/riskgrid_database.dart';
+import 'package:riskgrid/services/safety_location_service.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -15,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final LocalAuthService _authService = LocalAuthService();
   LocalUser? _user;
   bool _isLoading = true;
+  bool _developerMode = false;
 
   @override
   void initState() {
@@ -23,10 +28,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isDev = prefs.getBool('developerMode') ?? false;
     final user = await _authService.getLastStoredUser();
     if (mounted) {
       setState(() {
         _user = user;
+        _developerMode = isDev;
         _isLoading = false;
       });
     }
@@ -146,11 +154,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             value: _user!.biometricEnabled,
             onChanged: (val) async {
               HapticFeedback.selectionClick();
-              final messenger = ScaffoldMessenger.of(context);
               if (val) {
                 final result = await _authService.verifyBiometricsToEnable();
+                if (!context.mounted) return;
                 if (!result.isSuccess) {
-                  messenger.showSnackBar(
+                  ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(result.message),
                       behavior: SnackBarBehavior.floating,
@@ -160,13 +168,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
               }
               await _authService.updateBiometricPreference(val);
-              if (!mounted) return;
+              if (!context.mounted) return;
               setState(() => _user = LocalUser(
                 uid: _user!.uid, name: _user!.name, email: _user!.email, passwordHash: _user!.passwordHash,
                 publicUid: _user!.publicUid, pairingCode: _user!.pairingCode,
                 biometricEnabled: val, staySignedIn: _user!.staySignedIn,
               ));
-              messenger.showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(val ? 'Biometric login enabled.' : 'Biometric login disabled.'),
                   behavior: SnackBarBehavior.floating,
@@ -174,6 +182,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
             },
           ),
+          
+          const SizedBox(height: 32),
+          const Text('Developer Options', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          
+          SwitchListTile(
+            title: const Text('Developer Mode', style: TextStyle(color: Colors.white)),
+            subtitle: const Text('Enable test features and data wipe', style: TextStyle(color: Color(0xFF908A99))),
+            activeThumbColor: const Color(0xFF00E5FF),
+            value: _developerMode,
+            onChanged: (val) async {
+              HapticFeedback.selectionClick();
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('developerMode', val);
+              setState(() => _developerMode = val);
+            },
+          ),
+          if (_developerMode) ...[
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () async {
+                HapticFeedback.mediumImpact();
+                await RiskGridDatabase.instance.deleteAllUserZones();
+                await SafetyLocationService.instance.refreshZones();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Test data (user-flagged zones) wiped successfully.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.delete_forever_rounded, color: Colors.white),
+              label: const Text('Wipe All Flagged Test Data', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF5A1218),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ],
           
           const SizedBox(height: 48),
           ElevatedButton(

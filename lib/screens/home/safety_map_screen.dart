@@ -1,9 +1,11 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/danger_zone.dart';
 import '../../services/safety_location_service.dart';
+import '../../services/dynamic_island_service.dart';
 import '../../widgets/liquid_glass_container.dart';
 import '../../widgets/liquid_glass_text_field.dart';
 import '../../utils/app_haptics.dart';
@@ -15,41 +17,25 @@ class SafetyMapScreen extends StatefulWidget {
   State<SafetyMapScreen> createState() => _SafetyMapScreenState();
 }
 
-class _SafetyMapScreenState extends State<SafetyMapScreen>
-    with SingleTickerProviderStateMixin {
+class _SafetyMapScreenState extends State<SafetyMapScreen> {
   final MapController _mapController = MapController();
   final SafetyLocationService _locationService = SafetyLocationService.instance;
 
-  late AnimationController _islandController;
-  late Animation<double> _islandAnimation;
-
   bool _hasCenteredOnUser = false;
-  DangerZone? _selectedZone;
 
   @override
   void initState() {
     super.initState();
     _locationService.init();
 
-    // Dynamic Island camera module spring physics
-    _islandController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 380),
-    );
-
-    _islandAnimation = CurvedAnimation(
-      parent: _islandController,
-      curve: Curves.easeOutBack,
-      reverseCurve: Curves.easeInCubic,
-    );
-
     _locationService.locationNotifier.addListener(_onLocationUpdate);
+    _locationService.mapFocusZoneNotifier.addListener(_onMapFocusZoneChanged);
   }
 
   @override
   void dispose() {
     _locationService.locationNotifier.removeListener(_onLocationUpdate);
-    _islandController.dispose();
+    _locationService.mapFocusZoneNotifier.removeListener(_onMapFocusZoneChanged);
     super.dispose();
   }
 
@@ -58,6 +44,13 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
     if (userLoc != null && !_hasCenteredOnUser && mounted) {
       _hasCenteredOnUser = true;
       _mapController.move(userLoc, 16.0);
+    }
+  }
+
+  void _onMapFocusZoneChanged() {
+    final zone = _locationService.mapFocusZoneNotifier.value;
+    if (zone != null && mounted) {
+      _mapController.move(LatLng(zone.latitude, zone.longitude), 17.0);
     }
   }
 
@@ -77,18 +70,11 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
   }
 
   void _openDynamicIsland(DangerZone zone) {
-    AppHaptics.threatZoneTap(isDanger: zone.level == 'red');
-    setState(() => _selectedZone = zone);
-    _islandController.forward(from: 0.0);
+    DynamicIslandService.instance.showDangerZoneAlert(zone);
   }
 
   void _closeDynamicIsland() {
-    AppHaptics.dynamicIslandDismiss();
-    _islandController.reverse().then((_) {
-      if (mounted) {
-        setState(() => _selectedZone = null);
-      }
-    });
+    DynamicIslandService.instance.dismiss();
   }
 
   void _onMapTapped(LatLng tapPoint) {
@@ -107,7 +93,7 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
 
     if (tappedZone != null) {
       _openDynamicIsland(tappedZone);
-    } else if (_selectedZone != null) {
+    } else {
       _closeDynamicIsland();
     }
   }
@@ -210,8 +196,8 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
 
                             return Marker(
                               point: LatLng(zone.latitude, zone.longitude),
-                              width: 34,
-                              height: 34,
+                              width: 34.w,
+                              height: 34.h,
                               child: GestureDetector(
                                 behavior: HitTestBehavior.opaque,
                                 onTap: () => _openDynamicIsland(zone),
@@ -245,8 +231,8 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
                           if (userLocation != null)
                             Marker(
                               point: userLocation,
-                              width: 44,
-                              height: 44,
+                              width: 44.w,
+                              height: 44.h,
                               child: Container(
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
@@ -261,8 +247,8 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
                                 ),
                                 child: Center(
                                   child: Container(
-                                    width: 16,
-                                    height: 16,
+                                    width: 16.w,
+                                    height: 16.h,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: const Color(0xFF00E5FF),
@@ -287,191 +273,17 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
                         blurSigma: 6.0,
                         tintColor: const Color(0xFF120417),
                         tintOpacity: 0.75,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        child: const Row(
+                        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             _LegendDot(color: Color(0xFF7C4DFF), label: 'Predicted Risk'),
-                            SizedBox(width: 8),
+                            SizedBox(width: 8.w),
                             _LegendDot(color: Color(0xFFFFB800), label: 'Suspicion'),
-                            SizedBox(width: 8),
+                            SizedBox(width: 8.w),
                             _LegendDot(color: Color(0xFFFF1744), label: 'Danger'),
                           ],
                         ),
-                      ),
-                    ),
-                  ),
-
-                  // DYNAMIC ISLAND (Morphs from top camera module on threat circle tap)
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 6,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: AnimatedBuilder(
-                        animation: _islandAnimation,
-                        builder: (context, child) {
-                          if (_selectedZone == null && _islandController.value == 0.0) {
-                            return const SizedBox.shrink();
-                          }
-
-                          final double t = _islandAnimation.value;
-                          final double screenWidth = MediaQuery.of(context).size.width;
-
-                          final double islandWidth =
-                              ui.lerpDouble(120.0, screenWidth - 32.0, t)!;
-                          final double islandHeight =
-                              ui.lerpDouble(36.0, 96.0, t)!;
-                          final double borderRadius =
-                              ui.lerpDouble(20.0, 26.0, t)!;
-
-                          Color accentColor;
-                          if (_selectedZone?.isHistorical == true) {
-                            accentColor = const Color(0xFFB388FF);
-                          } else if (_selectedZone?.level == 'red') {
-                            accentColor = const Color(0xFFFF5252);
-                          } else {
-                            accentColor = const Color(0xFFFFC107);
-                          }
-
-                          return GestureDetector(
-                            onVerticalDragUpdate: (details) {
-                              if (details.primaryDelta! < -4) {
-                                _closeDynamicIsland();
-                              }
-                            },
-                            child: Container(
-                              width: islandWidth,
-                              height: islandHeight,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.94),
-                                borderRadius: BorderRadius.circular(borderRadius),
-                                border: Border.all(
-                                  color: accentColor.withValues(
-                                    alpha: ui.lerpDouble(0.3, 0.85, t)!,
-                                  ),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: accentColor.withValues(
-                                      alpha: ui.lerpDouble(0.0, 0.40, t)!,
-                                    ),
-                                    blurRadius: 18,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(borderRadius),
-                                child: BackdropFilter(
-                                  filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                                  child: t < 0.35
-                                      ? const SizedBox.shrink()
-                                      : FadeTransition(
-                                          opacity: _islandAnimation,
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 14.0,
-                                              vertical: 10.0,
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.all(9),
-                                                  decoration: BoxDecoration(
-                                                    color: accentColor.withValues(alpha: 0.20),
-                                                    shape: BoxShape.circle,
-                                                    border: Border.all(
-                                                      color: accentColor.withValues(alpha: 0.5),
-                                                    ),
-                                                  ),
-                                                  child: Icon(
-                                                    _selectedZone?.isHistorical == true
-                                                        ? Icons.history_edu_rounded
-                                                        : (_selectedZone?.level == 'red'
-                                                            ? Icons.warning_rounded
-                                                            : Icons.report_problem_rounded),
-                                                    color: accentColor,
-                                                    size: 22,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                    children: [
-                                                      Row(
-                                                        children: [
-                                                          Text(
-                                                            _selectedZone?.category ?? 'Risk Zone',
-                                                            style: const TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: 15.5,
-                                                              fontWeight: FontWeight.bold,
-                                                              fontFamily: 'Inter',
-                                                            ),
-                                                          ),
-                                                          const SizedBox(width: 8),
-                                                          Container(
-                                                            padding: const EdgeInsets.symmetric(
-                                                              horizontal: 6,
-                                                              vertical: 2,
-                                                            ),
-                                                            decoration: BoxDecoration(
-                                                              color: accentColor.withValues(alpha: 0.22),
-                                                              borderRadius: BorderRadius.circular(6),
-                                                            ),
-                                                            child: Text(
-                                                              _selectedZone?.isHistorical == true
-                                                                  ? 'AI Historical'
-                                                                  : '100m Zone',
-                                                              style: TextStyle(
-                                                                color: accentColor,
-                                                                fontSize: 10,
-                                                                fontWeight: FontWeight.bold,
-                                                                fontFamily: 'Inter',
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      const SizedBox(height: 3),
-                                                      Text(
-                                                        _selectedZone?.description.isNotEmpty == true
-                                                            ? _selectedZone!.description
-                                                            : (_selectedZone?.isHistorical == true
-                                                                ? 'Permanent predictive risk from police & open records'
-                                                                : 'Active user threat • Auto-expires in 6 hours'),
-                                                        maxLines: 2,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: const TextStyle(
-                                                          color: Color(0xFFC7C0CE),
-                                                          fontSize: 12,
-                                                          fontFamily: 'Inter',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons.close_rounded,
-                                                    color: Colors.white60,
-                                                    size: 20,
-                                                  ),
-                                                  onPressed: _closeDynamicIsland,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
                       ),
                     ),
                   ),
@@ -490,14 +302,14 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
                           blurSigma: 6.0,
                           tintColor: const Color(0xFF14081B),
                           tintOpacity: 0.80,
-                          padding: const EdgeInsets.all(14),
-                          child: const Icon(
+                          padding: EdgeInsets.all(14.r),
+                          child: Icon(
                             Icons.my_location_rounded,
                             color: Color(0xFF00E5FF),
                             size: 22,
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        SizedBox(height: 14.h),
 
                         // Liquid Glass "+" Button (Triggers "Flag a Risk" modal)
                         LiquidGlassContainer(
@@ -506,8 +318,8 @@ class _SafetyMapScreenState extends State<SafetyMapScreen>
                           blurSigma: 6.0,
                           tintColor: const Color(0xFF381024),
                           tintOpacity: 0.88,
-                          padding: const EdgeInsets.all(14),
-                          child: const Icon(
+                          padding: EdgeInsets.all(14.r),
+                          child: Icon(
                             Icons.add_rounded,
                             color: Color(0xFFD9779F),
                             size: 28,
@@ -538,14 +350,14 @@ class _LegendDot extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 8,
-          height: 8,
+          width: 8.w,
+          height: 8.h,
           decoration: BoxDecoration(shape: BoxShape.circle, color: color),
         ),
-        const SizedBox(width: 4),
+        SizedBox(width: 4.w),
         Text(
           label,
-          style: const TextStyle(color: Colors.white70, fontSize: 11, fontFamily: 'Inter'),
+          style: TextStyle(color: Colors.white70, fontSize: 11.sp, fontFamily: 'Inter'),
         ),
       ],
     );
@@ -614,143 +426,145 @@ class _LiquidGlassFlagRiskSheetState extends State<_LiquidGlassFlagRiskSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xEE120519),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               border: Border.all(
                 color: const Color(0x33D9779F),
-                width: 1.5,
+                width: 1.5.w,
               ),
             ),
-            padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Modal Drag Handle
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4.5,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // Modal Title: Strictly "Flag a Risk" without subtitles
-                const Text(
-                  'Flag a Risk',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-                const SizedBox(height: 22),
-
-                // Threat Level Selector: Liquid Glass Suspicion vs Danger buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildLiquidGlassThreatOption(
-                        level: 'amber',
-                        label: 'Suspicion',
-                        icon: Icons.report_problem_rounded,
-                        accentColor: const Color(0xFFFFB800),
+            padding: EdgeInsets.fromLTRB(24, 14, 24, 28),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Modal Drag Handle
+                  Center(
+                    child: Container(
+                      width: 44.w,
+                      height: 4.5.h,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(3.r),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildLiquidGlassThreatOption(
-                        level: 'red',
-                        label: 'Danger',
-                        icon: Icons.warning_rounded,
-                        accentColor: const Color(0xFFFF1744),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 22),
+                  ),
+                  SizedBox(height: 18.h),
 
-                // Hazard Category Selector (Liquid Glass Treatment)
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _categories.map((cat) {
-                    final isSelected = _selectedCategory == cat;
-                    return LiquidGlassContainer(
-                      onTap: () {
-                        AppHaptics.categoryChip();
-                        setState(() => _selectedCategory = cat);
-                      },
-                      borderRadius: 14,
-                      blurSigma: 4.0,
-                      tintColor: isSelected
-                          ? const Color(0xFF4A1832)
-                          : const Color(0xFF1B1123),
-                      tintOpacity: isSelected ? 0.85 : 0.60,
-                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
-                      child: Text(
-                        cat,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : const Color(0xFFA69EB0),
-                          fontSize: 13.5,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          fontFamily: 'Inter',
+                  // Modal Title: Strictly "Flag a Risk" without subtitles
+                  Text(
+                    'Flag a Risk',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22.sp,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  SizedBox(height: 22.h),
+
+                  // Threat Level Selector: Liquid Glass Suspicion vs Danger buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildLiquidGlassThreatOption(
+                          level: 'amber',
+                          label: 'Suspicion',
+                          icon: Icons.report_problem_rounded,
+                          accentColor: const Color(0xFFFFB800),
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 20),
-
-                // Brief Description Input
-                LiquidGlassTextField(
-                  controller: _descriptionController,
-                  hintText: 'Brief description (optional)',
-                ),
-                const SizedBox(height: 24),
-
-                // Submit Button: Titled "Flag Risk"
-                LiquidGlassContainer(
-                  onTap: _isSubmitting ? null : _submit,
-                  borderRadius: 14,
-                  tintColor: _selectedLevel == 'red'
-                      ? const Color(0xFF5A1218)
-                      : const Color(0xFF4A3410),
-                  tintOpacity: 0.90,
-                  blurSigma: 8.0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Center(
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text(
-                            'Flag Risk',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: _buildLiquidGlassThreatOption(
+                          level: 'red',
+                          label: 'Danger',
+                          icon: Icons.warning_rounded,
+                          accentColor: const Color(0xFFFF1744),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  SizedBox(height: 22.h),
+
+                  // Hazard Category Selector (Liquid Glass Treatment)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _categories.map((cat) {
+                      final isSelected = _selectedCategory == cat;
+                      return LiquidGlassContainer(
+                        onTap: () {
+                          AppHaptics.categoryChip();
+                          setState(() => _selectedCategory = cat);
+                        },
+                        borderRadius: 14,
+                        blurSigma: 4.0,
+                        tintColor: isSelected
+                            ? const Color(0xFF4A1832)
+                            : const Color(0xFF1B1123),
+                        tintOpacity: isSelected ? 0.85 : 0.60,
+                        padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 9.h),
+                        child: Text(
+                          cat,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : const Color(0xFFA69EB0),
+                            fontSize: 13.5.sp,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  SizedBox(height: 20.h),
+
+                  // Brief Description Input
+                  LiquidGlassTextField(
+                    controller: _descriptionController,
+                    hintText: 'Brief description (optional)',
+                  ),
+                  SizedBox(height: 24.h),
+
+                  // Submit Button: Titled "Flag Risk"
+                  LiquidGlassContainer(
+                    onTap: _isSubmitting ? null : _submit,
+                    borderRadius: 14,
+                    tintColor: _selectedLevel == 'red'
+                        ? const Color(0xFF5A1218)
+                        : const Color(0xFF4A3410),
+                    tintOpacity: 0.90,
+                    blurSigma: 8.0,
+                    padding: EdgeInsets.symmetric(vertical: 16.h),
+                    child: Center(
+                      child: _isSubmitting
+                          ? SizedBox(
+                              height: 20.h,
+                              width: 20.w,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              'Flag Risk',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17.sp,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -781,7 +595,7 @@ class _LiquidGlassFlagRiskSheetState extends State<_LiquidGlassFlagRiskSheet> {
           ? (level == 'red' ? const Color(0xFF4D1418) : const Color(0xFF403010))
           : const Color(0xFF1B1123),
       tintOpacity: isSelected ? 0.88 : 0.65,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      padding: EdgeInsets.symmetric(vertical: 14.h, horizontal: 16.w),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -790,13 +604,13 @@ class _LiquidGlassFlagRiskSheetState extends State<_LiquidGlassFlagRiskSheet> {
             color: isSelected ? accentColor : const Color(0xFF8A8294),
             size: 20,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8.w),
           Text(
             label,
             style: TextStyle(
               color: isSelected ? Colors.white : const Color(0xFFB0A8BA),
               fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-              fontSize: 15,
+              fontSize: 15.sp,
               fontFamily: 'Inter',
             ),
           ),

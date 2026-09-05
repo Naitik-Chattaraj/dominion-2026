@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'theme/app_theme.dart';
 import 'widgets/liquid_glass_navbar.dart';
 import 'screens/auth/sign_in_screen.dart';
@@ -10,6 +11,8 @@ import 'screens/news/news_feed_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'services/local_auth_service.dart';
 import 'services/safety_location_service.dart';
+import 'services/notification_service.dart';
+import 'widgets/fluid_liquid_glass_dynamic_island.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +25,7 @@ void main() {
     ),
   );
   runApp(const RiskGridApp());
+  NotificationService.instance.init();
 }
 
 class RiskGridApp extends StatelessWidget {
@@ -29,11 +33,18 @@ class RiskGridApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'RiskGrid',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: const AuthWrapper(),
+    return ScreenUtilInit(
+      designSize: const Size(390, 844), // iPhone 14 / Standard Android Size
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (context, child) {
+        return MaterialApp(
+          title: 'RiskGrid',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme,
+          home: const AuthWrapper(),
+        );
+      },
     );
   }
 }
@@ -57,34 +68,38 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkLoginStatus() async {
-    bool shouldLogin = await _localAuthService.shouldAutoLogin();
-    
-    // If not auto-login (stay signed in false), check if biometrics can save us
-    if (!shouldLogin) {
-      final lastUser = await _localAuthService.getLastStoredUser();
-      if (lastUser != null && lastUser.biometricEnabled) {
-         final result = await _localAuthService.signInWithBiometrics();
-         shouldLogin = result.isSuccess;
-      }
-    }
+    try {
+      final shouldLogin = await _localAuthService.shouldAutoLogin().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => false,
+      );
 
-    if (mounted) {
-      setState(() {
-        _isLoggedIn = shouldLogin;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = shouldLogin;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Auth check error: $e');
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = false;
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF070709),
+      return Scaffold(
+        backgroundColor: const Color(0xFF070709),
         body: Center(
           child: CircularProgressIndicator(
-            color: Color(0xFFD9779F),
-            strokeWidth: 2,
+            color: const Color(0xFFD9779F),
+            strokeWidth: 2.w,
           ),
         ),
       );
@@ -178,15 +193,12 @@ class MainShellScreenState extends State<MainShellScreen> {
       backgroundColor: const Color(0xFF070709),
       body: Stack(
         children: [
-          // Screen content
           Positioned.fill(
             child: IndexedStack(
               index: _currentIndex,
               children: screens,
             ),
           ),
-
-          // Floating Liquid Glass Dock Navbar
           Positioned(
             left: 0,
             right: 0,
@@ -194,10 +206,19 @@ class MainShellScreenState extends State<MainShellScreen> {
             child: LiquidGlassDockNavBar(
               currentIndex: _currentIndex,
               items: _dockItems,
-              bottomOffset: 24.0,
+              bottomOffset: 16.h,
               showSeparator: false,
               onTap: (index) {
                 setState(() => _currentIndex = index);
+              },
+            ),
+          ),
+          // Fluid Liquid Glass Dynamic Island anchored at the top camera notch
+          Positioned.fill(
+            child: FluidLiquidGlassDynamicIsland(
+              onViewOnMap: (zone) {
+                SafetyLocationService.instance.mapFocusZoneNotifier.value = zone;
+                setState(() => _currentIndex = 1);
               },
             ),
           ),

@@ -216,6 +216,15 @@ CREATE TABLE danger_zones (
     );
   }
 
+  // Developer Tool: wipe all non-historical zones
+  Future<void> deleteAllUserZones() async {
+    final db = await instance.database;
+    await db.delete(
+      'danger_zones',
+      where: 'isHistorical = 0',
+    );
+  }
+
   Future<void> close() async {
     final db = await instance.database;
     db.close();

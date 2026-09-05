@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/news_service.dart';
 import '../../widgets/liquid_glass_container.dart';
@@ -87,9 +88,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             top: -100,
             right: -50,
             child: Container(
-              width: 300,
-              height: 300,
-              decoration: const BoxDecoration(
+              width: 300.w,
+              height: 300.h,
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
@@ -106,25 +107,25 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 10.0),
                   child: Text(
                     'Local Intelligence',
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 28,
+                      fontSize: 28.sp,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
                 ),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(24.0, 0.0, 24.0, 20.0),
                   child: Text(
                     'Latest verified updates from around your area',
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 14,
+                      fontSize: 14.sp,
                       color: Color(0xFF908A99),
                     ),
                   ),
@@ -135,7 +136,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                     future: _newsFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
+                        return Center(
                           child: CircularProgressIndicator(color: Color(0xFF7C4DFF)),
                         );
                       }
@@ -143,26 +144,26 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                       if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
                         return Center(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                            padding: EdgeInsets.symmetric(horizontal: 32.0.w),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.wifi_off_rounded,
                                   color: Color(0xFF908A99),
                                   size: 48,
                                 ),
-                                const SizedBox(height: 16),
-                                const Text(
+                                SizedBox(height: 16.h),
+                                Text(
                                   'Unable to load latest intelligence.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Color(0xFF908A99),
-                                    fontSize: 15,
+                                    fontSize: 15.sp,
                                     fontFamily: 'Inter',
                                   ),
                                 ),
-                                const SizedBox(height: 20),
+                                SizedBox(height: 20.h),
                                 LiquidGlassContainer(
                                   onTap: () {
                                     AppHaptics.cardTap();
@@ -171,16 +172,16 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                                   borderRadius: 14,
                                   tintColor: const Color(0xFF2C1638),
                                   tintOpacity: 0.85,
-                                  padding: const EdgeInsets.symmetric(
+                                  padding: EdgeInsets.symmetric(
                                     horizontal: 24,
                                     vertical: 12,
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'Retry Fetching',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 14.sp,
                                     ),
                                   ),
                                 ),
@@ -201,10 +202,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                           await _newsFuture;
                         },
                         child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20.0, 0.0, 20.0, 100.0),
+                          padding: EdgeInsets.fromLTRB(18.0.w, 0.0, 18.0.w, 140.0.h),
                           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                           itemCount: articles.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 20),
+                          separatorBuilder: (context, index) => SizedBox(height: 15.h),
                           itemBuilder: (context, index) {
                             final article = articles[index];
                             return _buildNewsCard(article);
@@ -230,7 +231,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
           _launchUrl(article.link);
         }
       },
-      borderRadius: 20,
+      borderRadius: 16,
       tintColor: const Color(0xFF14081B),
       tintOpacity: 0.65,
       enableBlur: true,
@@ -241,24 +242,24 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
         children: [
           if (article.thumbnail.isNotEmpty)
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
               child: Image.network(
                 article.thumbnail,
-                height: 180,
+                height: 150.h,
                 width: double.infinity,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
-                  height: 180,
+                  height: 150.h,
                   color: const Color(0xFF1C1124),
-                  child: const Center(
-                    child: Icon(Icons.satellite_alt_rounded, color: Color(0xFF382942), size: 48),
+                  child: Center(
+                    child: Icon(Icons.satellite_alt_rounded, color: Color(0xFF382942), size: 42),
                   ),
                 ),
               ),
             ),
             
           Padding(
-            padding: const EdgeInsets.all(18.0),
+            padding: EdgeInsets.all(14.0.r),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -268,35 +269,35 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          margin: const EdgeInsets.only(right: 8),
+                          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.5.h),
+                          margin: EdgeInsets.only(right: 7.w),
                           decoration: BoxDecoration(
                             color: _getCategoryColor(article.category).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(4.r),
                             border: Border.all(color: _getCategoryColor(article.category).withValues(alpha: 0.5)),
                           ),
                           child: Text(
                             article.category.name.toUpperCase(),
                             style: TextStyle(
                               color: _getCategoryColor(article.category),
-                              fontSize: 9,
+                              fontSize: 8.sp,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 3.h),
                           decoration: BoxDecoration(
                             color: const Color(0xFF251C2B),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(5.r),
                           ),
                           child: Text(
                             article.sourceName.toUpperCase(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Color(0xFF9871BA),
-                              fontSize: 10,
+                              fontSize: 9.sp,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                              letterSpacing: 0.4,
                             ),
                           ),
                         ),
@@ -304,36 +305,36 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                     ),
                     Text(
                       _formatTimeAgo(article.pubDate),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Color(0xFF6F667A),
-                        fontSize: 12,
+                        fontSize: 10.5.sp,
                         fontFamily: 'Inter',
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 9.h),
                 Text(
                   article.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 17,
+                    fontSize: 14.5.sp,
                     fontWeight: FontWeight.w600,
                     fontFamily: 'Inter',
-                    height: 1.3,
+                    height: 1.25.h,
                   ),
                 ),
                 if (article.description.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  SizedBox(height: 6.h),
                   Text(
                     article.description.replaceAll(RegExp(r'<[^>]*>'), ''), // strip any HTML
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xFF908A99),
-                      fontSize: 14,
+                      fontSize: 12.sp,
                       fontFamily: 'Inter',
-                      height: 1.4,
+                      height: 1.35.h,
                     ),
                   ),
                 ]

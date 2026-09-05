@@ -6,6 +6,8 @@ import 'package:uuid/uuid.dart';
 import '../models/safety_models.dart';
 import '../models/danger_zone.dart';
 import '../database/riskgrid_database.dart';
+import '../utils/app_haptics.dart';
+import 'dynamic_island_service.dart';
 
 class SafetyLocationService {
   static final SafetyLocationService instance = SafetyLocationService._internal();
@@ -24,6 +26,9 @@ class SafetyLocationService {
 
   final ValueNotifier<String?> currentZoneInfoNotifier =
       ValueNotifier<String?>(null);
+
+  final ValueNotifier<DangerZone?> mapFocusZoneNotifier =
+      ValueNotifier<DangerZone?>(null);
 
   StreamSubscription<Position>? _positionSubscription;
   bool _isInitialized = false;
@@ -93,6 +98,7 @@ class SafetyLocationService {
     bool inRedZone = false;
     bool inAmberZone = false;
     String? matchedZoneName;
+    DangerZone? matchedDangerZone;
 
     for (final zone in zonesNotifier.value) {
       final double distance = Geolocator.distanceBetween(
@@ -106,10 +112,12 @@ class SafetyLocationService {
       if (distance <= zone.radiusMeters) {
         if (zone.level == 'red') {
           inRedZone = true;
+          matchedDangerZone = zone;
           matchedZoneName = '${zone.category} (${zone.radiusMeters.toInt()}m Danger)';
           break; // Red takes highest priority
         } else if (zone.level == 'amber' || zone.isHistorical) {
           inAmberZone = true;
+          matchedDangerZone ??= zone;
           matchedZoneName = zone.isHistorical
               ? 'AI Historical Risk: ${zone.category}'
               : '${zone.category} (Reported Hazard)';
@@ -119,13 +127,23 @@ class SafetyLocationService {
 
     currentZoneInfoNotifier.value = matchedZoneName;
 
+    final previousStatus = statusNotifier.value;
+    SafetyStatus newStatus = SafetyStatus.allGood;
+
     if (inRedZone) {
-      statusNotifier.value = SafetyStatus.riskyArea;
+      newStatus = SafetyStatus.riskyArea;
     } else if (inAmberZone) {
-      statusNotifier.value = SafetyStatus.staySafe;
-    } else {
-      statusNotifier.value = SafetyStatus.allGood;
+      newStatus = SafetyStatus.staySafe;
     }
+
+    if (newStatus == SafetyStatus.riskyArea && previousStatus != SafetyStatus.riskyArea) {
+      AppHaptics.flagDanger();
+      if (matchedDangerZone != null) {
+        DynamicIslandService.instance.showDangerZoneAlert(matchedDangerZone);
+      }
+    }
+
+    statusNotifier.value = newStatus;
   }
 
   /// Flags a 100-meter circular risk zone centered strictly at user's current GPS location
@@ -163,6 +181,9 @@ class SafetyLocationService {
 
     await _db.createDangerZone(newZone);
     await refreshZones();
+
+    // Trigger in-app Dynamic Island alert
+    DynamicIslandService.instance.showDangerZoneAlert(newZone, isNewFlag: true);
 
     return newZone;
   }
