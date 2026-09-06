@@ -210,6 +210,12 @@ class MainShellScreenState extends State<MainShellScreen> {
               showSeparator: false,
               onTap: (index) {
                 setState(() => _currentIndex = index);
+                if (index == 1) {
+                  final loc = SafetyLocationService.instance.locationNotifier.value;
+                  if (loc != null) {
+                    SafetyLocationService.instance.recenterMap(loc);
+                  }
+                }
               },
             ),
           ),

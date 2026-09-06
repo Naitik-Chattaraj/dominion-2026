@@ -8,6 +8,8 @@ class DangerZone {
   final String description;
   final DateTime timestamp;
   final bool isHistorical; // true = permanent AI predicted zone, false = 6h user-flagged
+  final bool isSuppressed; // true if hidden because of a higher level elevation
+  final String? suppressedZoneId; // ID of the zone it suppressed, if any
 
   DangerZone({
     required this.id,
@@ -19,6 +21,8 @@ class DangerZone {
     this.description = '',
     required this.timestamp,
     this.isHistorical = false,
+    this.isSuppressed = false,
+    this.suppressedZoneId,
   });
 
   bool get isExpired {
@@ -37,6 +41,8 @@ class DangerZone {
       'description': description,
       'timestamp': timestamp.toIso8601String(),
       'isHistorical': isHistorical ? 1 : 0,
+      'isSuppressed': isSuppressed ? 1 : 0,
+      'suppressedZoneId': suppressedZoneId,
     };
   }
 
@@ -51,6 +57,8 @@ class DangerZone {
       description: map['description'] as String? ?? '',
       timestamp: DateTime.parse(map['timestamp'] as String),
       isHistorical: (map['isHistorical'] as int?) == 1,
+      isSuppressed: (map['isSuppressed'] as int?) == 1,
+      suppressedZoneId: map['suppressedZoneId'] as String?,
     );
   }
 }

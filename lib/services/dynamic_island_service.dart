@@ -11,6 +11,9 @@ class DynamicIslandService {
 
   final ValueNotifier<DynamicIslandAlert?> alertNotifier =
       ValueNotifier<DynamicIslandAlert?>(null);
+      
+  final ValueNotifier<bool> nativeNotificationsEnabled = 
+      ValueNotifier<bool>(true);
 
   void showDangerZoneAlert(
     DangerZone zone, {
@@ -41,8 +44,8 @@ class DynamicIslandService {
 
     AppHaptics.threatZoneTap(isDanger: zone.level == 'red');
 
-    // Only trigger native notification if explicitly requested (e.g. user enters a zone)
-    if (showNativeNotification) {
+    // Only trigger native notification if explicitly requested and globally enabled
+    if (showNativeNotification && nativeNotificationsEnabled.value) {
       NotificationService.instance.showHighPriorityNotification(
         id: zone.id.hashCode,
         title: title,

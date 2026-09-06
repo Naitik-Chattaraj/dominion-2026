@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import 'safety_location_service.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:xml/xml.dart';
 
@@ -228,37 +230,80 @@ class NewsService {
   static final NewsService _instance = NewsService._internal();
   static NewsService get instance => _instance;
 
-  NewsService._internal();
+  NewsService._internal() {
+    // Automatically re-fetch news whenever user location updates (real GPS or Mock)
+    SafetyLocationService.instance.locationNotifier.addListener(() {
+      final loc = SafetyLocationService.instance.locationNotifier.value;
+      if (loc != null) {
+        if (_lastFetchedPosition == null) {
+          fetchLocalNews(forceRefresh: true);
+        } else {
+          final dist = Geolocator.distanceBetween(
+            _lastFetchedPosition!.latitude,
+            _lastFetchedPosition!.longitude,
+            loc.latitude,
+            loc.longitude,
+          );
+          if (dist > 1000 || SafetyLocationService.instance.isMockingLocation) {
+            fetchLocalNews(forceRefresh: true);
+          }
+        }
+      }
+    });
+  }
+
+  final ValueNotifier<List<NewsArticle>> newsArticlesNotifier = ValueNotifier<List<NewsArticle>>([]);
+  final ValueNotifier<bool> isFetchingNotifier = ValueNotifier<bool>(false);
 
   List<NewsArticle> _cachedNews = [];
   Position? _lastFetchedPosition;
   DateTime? _lastFetchedTime;
-  String lastResolvedCity = "your area";
+  String lastResolvedCity = "Local Area";
   Future<List<NewsArticle>>? _inFlightFuture;
 
-  Future<List<NewsArticle>> fetchLocalNews({bool forceRefresh = false}) async {
+  Future<List<NewsArticle>> fetchLocalNews({bool forceRefresh = false, String? customCityHint}) async {
     if (_inFlightFuture != null && !forceRefresh) {
       return _inFlightFuture!;
     }
 
-    _inFlightFuture = _executeFetch(forceRefresh).whenComplete(() {
+    isFetchingNotifier.value = true;
+    _inFlightFuture = _executeFetch(forceRefresh, customCityHint: customCityHint).whenComplete(() {
       _inFlightFuture = null;
+      isFetchingNotifier.value = false;
     });
 
-    return _inFlightFuture!;
+    final results = await _inFlightFuture!;
+    newsArticlesNotifier.value = List.unmodifiable(results);
+    return results;
   }
 
-  Future<List<NewsArticle>> _executeFetch(bool forceRefresh) async {
+  Future<List<NewsArticle>> _executeFetch(bool forceRefresh, {String? customCityHint}) async {
     bool shouldFetch = forceRefresh;
     Position? currentPos;
     
     try {
-      currentPos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 5),
-        ),
-      );
+      if (SafetyLocationService.instance.isMockingLocation && SafetyLocationService.instance.mockLocation != null) {
+        final mLoc = SafetyLocationService.instance.mockLocation!;
+        currentPos = Position(
+          longitude: mLoc.longitude,
+          latitude: mLoc.latitude,
+          timestamp: DateTime.now(),
+          accuracy: 0,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        );
+      } else {
+        currentPos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+      }
       
       if (_lastFetchedPosition == null || _lastFetchedTime == null) {
         shouldFetch = true;
@@ -269,7 +314,7 @@ class NewsService {
           currentPos.latitude,
           currentPos.longitude,
         );
-        if (distance > 5000) {
+        if (distance > 1000 || SafetyLocationService.instance.isMockingLocation) {
           shouldFetch = true;
         } else if (DateTime.now().difference(_lastFetchedTime!).inMinutes > 30) {
           shouldFetch = true;
@@ -281,11 +326,12 @@ class NewsService {
     }
 
     if (!shouldFetch && _cachedNews.isNotEmpty) {
+      newsArticlesNotifier.value = List.unmodifiable(_cachedNews);
       return _cachedNews;
     }
 
     // Try to get city name
-    String city = "Chennai"; // fallback
+    String city = customCityHint ?? SafetyLocationService.instance.mockLocationName ?? "Local Area";
     if (currentPos != null) {
       try {
         List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(
@@ -293,20 +339,39 @@ class NewsService {
           currentPos.longitude,
         );
         if (placemarks.isNotEmpty) {
-          city = placemarks.first.locality ?? placemarks.first.subLocality ?? "Chennai";
-          lastResolvedCity = city;
+          final p = placemarks.first;
+          String? candidate;
+          if (p.locality != null && p.locality!.trim().isNotEmpty) {
+            candidate = p.locality!.trim();
+          } else if (p.subLocality != null && p.subLocality!.trim().isNotEmpty) {
+            candidate = p.subLocality!.trim();
+          } else if (p.subAdministrativeArea != null && p.subAdministrativeArea!.trim().isNotEmpty) {
+            candidate = p.subAdministrativeArea!.trim();
+          } else if (p.administrativeArea != null && p.administrativeArea!.trim().isNotEmpty) {
+            candidate = p.administrativeArea!.trim();
+          } else if (p.name != null && p.name!.trim().isNotEmpty) {
+            candidate = p.name!.trim();
+          }
+          if (candidate != null && candidate.isNotEmpty) {
+            city = candidate;
+          }
         }
       } catch (e) {
         // Reverse geocoding failed
       }
     }
 
+    if (city == "Local Area" || city.trim().isEmpty) {
+      city = customCityHint ?? SafetyLocationService.instance.mockLocationName ?? "Local Area";
+    }
+    lastResolvedCity = city;
+
     try {
       // Fetch from Google News RSS
       final query = Uri.encodeComponent('$city AND (crime OR accident OR hazard OR police OR fire OR alert OR emergency)');
-      final rssUrl = 'https://news.google.com/rss/search?q=$query&hl=en-IN&gl=IN&ceid=IN:en';
+      final rssUrl = 'https://news.google.com/rss/search?q=$query';
       
-      final response = await http.get(Uri.parse(rssUrl)).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(rssUrl)).timeout(const Duration(seconds: 8));
       
       if (response.statusCode == 200) {
         final document = XmlDocument.parse(response.body);
@@ -317,14 +382,12 @@ class NewsService {
         int itemIdx = 0;
         for (var item in items) {
           final article = NewsArticle.fromXml(item, index: itemIdx, usedUrls: usedThumbs);
-          // Apply Regex relevance filter
           if (NewsArticle._isRelevant('${article.title} ${article.description}')) {
              parsedNews.add(article);
              itemIdx++;
           }
         }
         
-        // Take top 15
         if (parsedNews.length > 15) {
           parsedNews = parsedNews.sublist(0, 15);
         }
@@ -333,17 +396,19 @@ class NewsService {
           _cachedNews = parsedNews;
           _lastFetchedPosition = currentPos;
           _lastFetchedTime = DateTime.now();
+          newsArticlesNotifier.value = List.unmodifiable(_cachedNews);
           return _cachedNews;
         }
       }
     } catch (e) {
-      // Ignore network errors, fallback to mock/cache
+      // Ignore network errors, fallback to localized mock
     }
 
-    if (_cachedNews.isEmpty) {
-      _cachedNews = _getMockNews(city);
-    }
-
+    // Always ensure fresh, localized mock news if RSS is empty or failed
+    _cachedNews = _getMockNews(city);
+    _lastFetchedPosition = currentPos;
+    _lastFetchedTime = DateTime.now();
+    newsArticlesNotifier.value = List.unmodifiable(_cachedNews);
     return _cachedNews;
   }
 

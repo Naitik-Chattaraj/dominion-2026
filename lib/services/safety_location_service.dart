@@ -89,7 +89,49 @@ class SafetyLocationService {
     }
   }
 
+  bool _isMockingLocation = false;
+  LatLng? _mockLocation;
+  String? _mockLocationName;
+  Position? _lastRealPosition;
+  final ValueNotifier<LatLng?> mapRecenterNotifier = ValueNotifier<LatLng?>(null);
+
+  void recenterMap(LatLng target) {
+    mapRecenterNotifier.value = target;
+  }
+
+  void enableMockLocation(double lat, double lng, {String? locationName}) {
+    _isMockingLocation = true;
+    _mockLocation = LatLng(lat, lng);
+    _mockLocationName = locationName;
+    locationNotifier.value = _mockLocation;
+    mapRecenterNotifier.value = _mockLocation;
+    _recalculateSafetyStatus(lat, lng);
+  }
+
+  void disableMockLocation() {
+    _isMockingLocation = false;
+    _mockLocation = null;
+    _mockLocationName = null;
+    if (_lastRealPosition != null) {
+      _updateUserPosition(_lastRealPosition!);
+      mapRecenterNotifier.value = LatLng(_lastRealPosition!.latitude, _lastRealPosition!.longitude);
+    } else {
+      Geolocator.getCurrentPosition().then((pos) {
+        if (!_isMockingLocation) {
+          _updateUserPosition(pos);
+          mapRecenterNotifier.value = LatLng(pos.latitude, pos.longitude);
+        }
+      }).catchError((_) {});
+    }
+  }
+
+  bool get isMockingLocation => _isMockingLocation;
+  LatLng? get mockLocation => _mockLocation;
+  String? get mockLocationName => _mockLocationName;
+
   void _updateUserPosition(Position pos) {
+    _lastRealPosition = pos;
+    if (_isMockingLocation) return;
     locationNotifier.value = LatLng(pos.latitude, pos.longitude);
     _recalculateSafetyStatus(pos.latitude, pos.longitude);
   }

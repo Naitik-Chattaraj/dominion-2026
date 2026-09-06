@@ -23,7 +23,7 @@ class RiskGridDatabase {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -58,7 +58,9 @@ CREATE TABLE danger_zones (
   category $textType,
   description $textType,
   timestamp $textType,
-  isHistorical $boolType
+  isHistorical $boolType,
+  isSuppressed $boolType,
+  suppressedZoneId TEXT
 )
 ''');
 
@@ -87,6 +89,11 @@ CREATE TABLE danger_zones (
 )
 ''');
       await _seedHistoricalZones(db);
+    }
+    
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE danger_zones ADD COLUMN isSuppressed INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE danger_zones ADD COLUMN suppressedZoneId TEXT');
     }
   }
 
@@ -125,6 +132,42 @@ CREATE TABLE danger_zones (
         category: 'High Traffic Blindspot',
         description: 'AI Historical Analysis: Blind curve with high bicycle collision history.',
         timestamp: DateTime.now().subtract(const Duration(days: 60)),
+        isHistorical: true,
+      ),
+      // Times Square, NY
+      DangerZone(
+        id: 'hist_nyc_1',
+        latitude: 40.7580,
+        longitude: -73.9855,
+        radiusMeters: 250.0,
+        level: 'amber',
+        category: 'Pickpocketing Hotspot',
+        description: 'AI Historical Analysis: Elevated petty theft incidents during peak tourist hours.',
+        timestamp: DateTime.now().subtract(const Duration(days: 10)),
+        isHistorical: true,
+      ),
+      // London (Trafalgar Square)
+      DangerZone(
+        id: 'hist_london_1',
+        latitude: 51.5080,
+        longitude: -0.1281,
+        radiusMeters: 180.0,
+        level: 'amber',
+        category: 'Late Night Disruptions',
+        description: 'AI Historical Analysis: Recurrent public disturbances post-midnight.',
+        timestamp: DateTime.now().subtract(const Duration(days: 15)),
+        isHistorical: true,
+      ),
+      // Mumbai (Dharavi Outskirts)
+      DangerZone(
+        id: 'hist_mumbai_1',
+        latitude: 19.0380,
+        longitude: 72.8538,
+        radiusMeters: 200.0,
+        level: 'amber',
+        category: 'Hazardous Construction',
+        description: 'AI Historical Analysis: Open debris and unbarricaded road works.',
+        timestamp: DateTime.now().subtract(const Duration(days: 5)),
         isHistorical: true,
       ),
     ];
@@ -194,10 +237,10 @@ CREATE TABLE danger_zones (
     // Calculate timestamp 6 hours ago
     final sixHoursAgo = DateTime.now().subtract(const Duration(hours: 6)).toIso8601String();
     
-    // Return permanent AI historical zones OR user-flagged zones under 6 hours old
+    // Return permanent AI historical zones OR user-flagged zones under 6 hours old, if not suppressed
     final maps = await db.query(
       'danger_zones',
-      where: 'isHistorical = 1 OR timestamp > ?',
+      where: '(isHistorical = 1 OR timestamp > ?) AND isSuppressed = 0',
       whereArgs: [sixHoursAgo],
     );
     
@@ -209,37 +252,79 @@ CREATE TABLE danger_zones (
     final db = await instance.database;
     final sixHoursAgo = DateTime.now().subtract(const Duration(hours: 6)).toIso8601String();
     
-    await db.delete(
-      'danger_zones',
-      where: 'isHistorical = 0 AND timestamp <= ?',
-      whereArgs: [sixHoursAgo],
-    );
+    await db.transaction((txn) async {
+      final toDelete = await txn.query(
+        'danger_zones',
+        where: 'isHistorical = 0 AND timestamp <= ?',
+        whereArgs: [sixHoursAgo],
+      );
+      
+      for (var zone in toDelete) {
+        if (zone['suppressedZoneId'] != null) {
+          await txn.update(
+            'danger_zones',
+            {'isSuppressed': 0},
+            where: 'id = ?',
+            whereArgs: [zone['suppressedZoneId']],
+          );
+        }
+      }
+
+      await txn.delete(
+        'danger_zones',
+        where: 'isHistorical = 0 AND timestamp <= ?',
+        whereArgs: [sixHoursAgo],
+      );
+    });
   }
 
   // Developer Tool: wipe all non-historical zones
   Future<void> deleteAllUserZones() async {
     final db = await instance.database;
-    await db.delete(
-      'danger_zones',
-      where: 'isHistorical = 0',
-    );
+    await db.transaction((txn) async {
+      final toDelete = await txn.query(
+        'danger_zones',
+        where: 'isHistorical = 0',
+      );
+      
+      for (var zone in toDelete) {
+        if (zone['suppressedZoneId'] != null) {
+          await txn.update(
+            'danger_zones',
+            {'isSuppressed': 0},
+            where: 'id = ?',
+            whereArgs: [zone['suppressedZoneId']],
+          );
+        }
+      }
+
+      await txn.delete(
+        'danger_zones',
+        where: 'isHistorical = 0',
+      );
+    });
   }
 
-  // Elevate a suspicious zone to danger (suspicion removed, danger enabled)
+  // Elevate a suspicious zone to danger (suspicion suppressed, danger enabled)
   Future<void> elevateZoneToDanger({
     required String oldZoneId,
     required DangerZone elevatedZone,
   }) async {
     final db = await instance.database;
     await db.transaction((txn) async {
-      await txn.delete(
+      await txn.update(
         'danger_zones',
+        {'isSuppressed': 1},
         where: 'id = ?',
         whereArgs: [oldZoneId],
       );
+      
+      final newZoneMap = elevatedZone.toMap();
+      newZoneMap['suppressedZoneId'] = oldZoneId;
+      
       await txn.insert(
         'danger_zones',
-        elevatedZone.toMap(),
+        newZoneMap,
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     });

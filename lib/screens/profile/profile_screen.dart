@@ -8,6 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:riskgrid/database/riskgrid_database.dart';
 import 'package:riskgrid/services/safety_location_service.dart';
+import 'package:riskgrid/screens/profile/playground_screen.dart' as riskgrid_playground;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -220,6 +221,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF5A1218),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => const riskgrid_playground.PlaygroundScreen(),
+                ));
+              },
+              icon: const Icon(Icons.architecture_rounded, color: Colors.white),
+              label: const Text('Developer Playground', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF14081B),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFD9779F), width: 1.5),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),

@@ -31,20 +31,31 @@ class _SafetyMapScreenState extends State<SafetyMapScreen> {
 
     _locationService.locationNotifier.addListener(_onLocationUpdate);
     _locationService.mapFocusZoneNotifier.addListener(_onMapFocusZoneChanged);
+    _locationService.mapRecenterNotifier.addListener(_onMapRecenterRequested);
   }
 
   @override
   void dispose() {
     _locationService.locationNotifier.removeListener(_onLocationUpdate);
     _locationService.mapFocusZoneNotifier.removeListener(_onMapFocusZoneChanged);
+    _locationService.mapRecenterNotifier.removeListener(_onMapRecenterRequested);
     super.dispose();
+  }
+
+  void _onMapRecenterRequested() {
+    final target = _locationService.mapRecenterNotifier.value;
+    if (target != null && mounted) {
+      _mapController.move(target, 16.0);
+    }
   }
 
   void _onLocationUpdate() {
     final userLoc = _locationService.locationNotifier.value;
-    if (userLoc != null && !_hasCenteredOnUser && mounted) {
-      _hasCenteredOnUser = true;
-      _mapController.move(userLoc, 16.0);
+    if (userLoc != null && mounted) {
+      if (!_hasCenteredOnUser || _locationService.isMockingLocation) {
+        _hasCenteredOnUser = true;
+        _mapController.move(userLoc, 16.0);
+      }
     }
   }
 

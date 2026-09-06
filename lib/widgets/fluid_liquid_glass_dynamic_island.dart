@@ -112,9 +112,9 @@ class _FluidLiquidGlassDynamicIslandState
         final topPadding = MediaQuery.of(context).padding.top;
 
         // Fluid morph dimensions: from a compact punch-hole pill into expanded glass capsule
-        final targetWidth = (screenWidth - 24.w).clamp(310.0, 420.0);
+        final targetWidth = (screenWidth - 20.w).clamp(340.0, 460.0);
         final double currentWidth = ui.lerpDouble(90.w, targetWidth, tClamped)!;
-        final double currentHeight = ui.lerpDouble(28.h, 86.h, tClamped)!;
+        final double currentHeight = ui.lerpDouble(28.h, 100.h, tClamped)!;
         final double borderRadius = ui.lerpDouble(18.r, 26.r, tClamped)!;
 
         final alert = _currentAlert;
@@ -233,8 +233,8 @@ class _FluidLiquidGlassDynamicIslandState
                                 OverflowBox(
                                   minWidth: targetWidth,
                                   maxWidth: targetWidth,
-                                  minHeight: 86.h,
-                                  maxHeight: 86.h,
+                                  minHeight: 100.h,
+                                  maxHeight: 100.h,
                                   alignment: Alignment.center,
                                   child: _buildExpandedIslandContent(
                                     alert: alert,
@@ -354,27 +354,14 @@ class _FluidLiquidGlassDynamicIslandState
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Flexible(
-                        child: Text(
-                          alert.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13.5.sp,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Inter',
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 6.w),
                       Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 6.w,
                           vertical: 2.h,
                         ),
+                        margin: EdgeInsets.only(right: 6.w),
                         decoration: BoxDecoration(
                           color: accentColor.withValues(alpha: 0.25),
                           borderRadius: BorderRadius.circular(6.r),
@@ -384,28 +371,55 @@ class _FluidLiquidGlassDynamicIslandState
                           ),
                         ),
                         child: Text(
-                          alert.tagLabel,
+                          alert.tagLabel.toUpperCase(),
                           style: TextStyle(
                             color: accentColor,
-                            fontSize: 8.5.sp,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.6,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          "Just Now",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w500,
                             fontFamily: 'Inter',
                           ),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 3.h),
+                  SizedBox(height: 4.h),
+                  Text(
+                    alert.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.5.sp,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Inter',
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
                   Text(
                     alert.description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: const Color(0xFFC7C0CE),
-                      fontSize: 11.sp,
+                      color: const Color(0xFFDCD6E3),
+                      fontSize: 11.5.sp,
+                      fontWeight: FontWeight.w400,
                       fontFamily: 'Inter',
-                      height: 1.25,
+                      height: 1.3,
                     ),
                   ),
                 ],

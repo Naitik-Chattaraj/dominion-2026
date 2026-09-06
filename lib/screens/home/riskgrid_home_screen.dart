@@ -12,6 +12,7 @@ import '../../services/safety_location_service.dart';
 import '../../services/news_service.dart';
 import '../../widgets/liquid_glass_container.dart';
 import '../../utils/app_haptics.dart';
+import '../../services/dynamic_island_service.dart';
 
 class RiskGridHomeScreen extends StatefulWidget {
   final void Function(int)? onNavigate;
@@ -30,7 +31,6 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
   late AnimationController _flowController;
   late Animation<double> _flowAnimation;
 
-  late Future<List<NewsArticle>> _newsFuture;
   final MapController _miniMapController = MapController();
 
   @override
@@ -39,7 +39,7 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
     // Initialize with location service or widget override
     _currentStatus = widget.initialStatus ?? SafetyLocationService.instance.statusNotifier.value;
     
-    _newsFuture = NewsService.instance.fetchLocalNews();
+    NewsService.instance.fetchLocalNews();
     _prevStatus = _currentStatus;
 
     _flowController = AnimationController(
@@ -57,14 +57,20 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
     // Live reactive binding to GPS proximity engine
     SafetyLocationService.instance.statusNotifier.addListener(_onStatusChanged);
     SafetyLocationService.instance.locationNotifier.addListener(_onLocationChanged);
+    NewsService.instance.newsArticlesNotifier.addListener(_onNewsArticlesUpdated);
   }
 
   @override
   void dispose() {
     SafetyLocationService.instance.statusNotifier.removeListener(_onStatusChanged);
     SafetyLocationService.instance.locationNotifier.removeListener(_onLocationChanged);
+    NewsService.instance.newsArticlesNotifier.removeListener(_onNewsArticlesUpdated);
     _flowController.dispose();
     super.dispose();
+  }
+
+  void _onNewsArticlesUpdated() {
+    if (mounted) setState(() {});
   }
 
   void _onLocationChanged() {
@@ -175,28 +181,43 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                         ],
                       ),
 
-                      LiquidGlassContainer(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('No new alerts in your current grid zone'),
-                              duration: Duration(seconds: 2),
-                              behavior: SnackBarBehavior.floating,
+                      AnimatedBuilder(
+                        animation: DynamicIslandService.instance.nativeNotificationsEnabled,
+                        builder: (context, _) {
+                          final isEnabled = DynamicIslandService.instance.nativeNotificationsEnabled.value;
+                          return LiquidGlassContainer(
+                            onTap: () {
+                              AppHaptics.cardTap();
+                              DynamicIslandService.instance.nativeNotificationsEnabled.value = !isEnabled;
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isEnabled ? 'Native OS alerts muted' : 'Native OS alerts active',
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            },
+                            borderRadius: 18.0,
+                            blurSigma: 5.0,
+                            tintOpacity: 0.42,
+                            tintColor: const Color(0xFF16091E),
+                            padding: EdgeInsets.all(8.0.r),
+                            enableBlur: true,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                              child: Icon(
+                                isEnabled ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+                                key: ValueKey(isEnabled),
+                                color: isEnabled ? Colors.white : Colors.white54,
+                                size: 20.0,
+                              ),
                             ),
                           );
                         },
-                        borderRadius: 18.0,
-                        blurSigma: 5.0, // Reduced by 50%
-                        tintOpacity: 0.42,
-                        tintColor: const Color(0xFF16091E),
-                        padding: EdgeInsets.all(8.0.r),
-                        enableBlur: true,
-                        child: Icon(
-                          Icons.notifications_none_rounded,
-                          color: Colors.white,
-                          size: 20.0,
-                        ),
                       ),
                     ],
                   ),
@@ -452,29 +473,32 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                   // Incident Cards Horizontal Carousel (Scaled down ~15%)
                   SizedBox(
                     height: 298.h, 
-                    child: FutureBuilder<List<NewsArticle>>(
-                      future: _newsFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return Center(
-                            child: CircularProgressIndicator(color: Color(0xFFD9779F)),
-                          );
-                        }
-                        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                          return Center(
-                            child: Text(
-                              'No local updates at this moment.',
-                              style: TextStyle(color: Color(0xFF908A99)),
-                            ),
-                          );
-                        }
-                        
-                        final articles = snapshot.data!.take(4).toList();
+                    child: ValueListenableBuilder<List<NewsArticle>>(
+                      valueListenable: NewsService.instance.newsArticlesNotifier,
+                      builder: (context, articles, _) {
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: NewsService.instance.isFetchingNotifier,
+                          builder: (context, isFetching, _) {
+                            if (isFetching && articles.isEmpty) {
+                              return const Center(
+                                child: CircularProgressIndicator(color: Color(0xFFD9779F)),
+                              );
+                            }
+                            if (articles.isEmpty) {
+                              return const Center(
+                                child: Text(
+                                  'No local updates at this moment.',
+                                  style: TextStyle(color: Color(0xFF908A99)),
+                                ),
+                              );
+                            }
+                            
+                            final displayArticles = articles.take(4).toList();
 
-                        return ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: articles.length,
+                            return ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              itemCount: displayArticles.length,
                           separatorBuilder: (context, index) => SizedBox(width: 14.w),
                           itemBuilder: (context, index) {
                             final article = articles[index];
@@ -629,7 +653,9 @@ class _RiskGridHomeScreenState extends State<RiskGridHomeScreen>
                           },
                         );
                       },
-                    ),
+                    );
+                  },
+                ),
                   ),
 
                   SizedBox(height: 135.h),

@@ -13,18 +13,21 @@ class NewsFeedScreen extends StatefulWidget {
 }
 
 class _NewsFeedScreenState extends State<NewsFeedScreen> {
-  late Future<List<NewsArticle>> _newsFuture;
-
   @override
   void initState() {
     super.initState();
-    _loadNews();
+    NewsService.instance.newsArticlesNotifier.addListener(_onNewsChanged);
+    NewsService.instance.fetchLocalNews();
   }
 
-  void _loadNews({bool forceRefresh = false}) {
-    setState(() {
-      _newsFuture = NewsService.instance.fetchLocalNews(forceRefresh: forceRefresh);
-    });
+  @override
+  void dispose() {
+    NewsService.instance.newsArticlesNotifier.removeListener(_onNewsChanged);
+    super.dispose();
+  }
+
+  void _onNewsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _launchUrl(String urlString) async {
@@ -132,85 +135,87 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                 ),
                 
                 Expanded(
-                  child: FutureBuilder<List<NewsArticle>>(
-                    future: _newsFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(
-                          child: CircularProgressIndicator(color: Color(0xFF7C4DFF)),
-                        );
-                      }
-                      
-                      if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                        return Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 32.0.w),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.wifi_off_rounded,
-                                  color: Color(0xFF908A99),
-                                  size: 48,
-                                ),
-                                SizedBox(height: 16.h),
-                                Text(
-                                  'Unable to load latest intelligence.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Color(0xFF908A99),
-                                    fontSize: 15.sp,
-                                    fontFamily: 'Inter',
-                                  ),
-                                ),
-                                SizedBox(height: 20.h),
-                                LiquidGlassContainer(
-                                  onTap: () {
-                                    AppHaptics.cardTap();
-                                    _loadNews(forceRefresh: true);
-                                  },
-                                  borderRadius: 14,
-                                  tintColor: const Color(0xFF2C1638),
-                                  tintOpacity: 0.85,
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 12,
-                                  ),
-                                  child: Text(
-                                    'Retry Fetching',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14.sp,
+                  child: ValueListenableBuilder<List<NewsArticle>>(
+                    valueListenable: NewsService.instance.newsArticlesNotifier,
+                    builder: (context, articles, _) {
+                      return ValueListenableBuilder<bool>(
+                        valueListenable: NewsService.instance.isFetchingNotifier,
+                        builder: (context, isFetching, _) {
+                          if (isFetching && articles.isEmpty) {
+                            return const Center(
+                              child: CircularProgressIndicator(color: Color(0xFF7C4DFF)),
+                            );
+                          }
+                          
+                          if (articles.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 32.0.w),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.wifi_off_rounded,
+                                      color: Color(0xFF908A99),
+                                      size: 48,
                                     ),
-                                  ),
+                                    SizedBox(height: 16.h),
+                                    Text(
+                                      'Unable to load latest intelligence.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: const Color(0xFF908A99),
+                                        fontSize: 15.sp,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                    SizedBox(height: 20.h),
+                                    LiquidGlassContainer(
+                                      onTap: () {
+                                        AppHaptics.cardTap();
+                                        NewsService.instance.fetchLocalNews(forceRefresh: true);
+                                      },
+                                      borderRadius: 14,
+                                      tintColor: const Color(0xFF2C1638),
+                                      tintOpacity: 0.85,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 12,
+                                      ),
+                                      child: Text(
+                                        'Retry Fetching',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14.sp,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
+                            );
+                          }
+                          
+                          return RefreshIndicator(
+                            color: const Color(0xFF7C4DFF),
+                            backgroundColor: const Color(0xFF16151A),
+                            onRefresh: () async {
+                              await AppHaptics.pullRefresh();
+                              await NewsService.instance.fetchLocalNews(forceRefresh: true);
+                            },
+                            child: ListView.separated(
+                              padding: EdgeInsets.fromLTRB(18.0.w, 0.0, 18.0.w, 140.0.h),
+                              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                              itemCount: articles.length,
+                              separatorBuilder: (context, index) => SizedBox(height: 15.h),
+                              itemBuilder: (context, index) {
+                                final article = articles[index];
+                                return _buildNewsCard(article);
+                              },
                             ),
-                          ),
-                        );
-                      }
-                      
-                      final articles = snapshot.data!;
-                      
-                      return RefreshIndicator(
-                        color: const Color(0xFF7C4DFF),
-                        backgroundColor: const Color(0xFF16151A),
-                        onRefresh: () async {
-                          await AppHaptics.pullRefresh();
-                          _loadNews(forceRefresh: true);
-                          await _newsFuture;
+                          );
                         },
-                        child: ListView.separated(
-                          padding: EdgeInsets.fromLTRB(18.0.w, 0.0, 18.0.w, 140.0.h),
-                          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                          itemCount: articles.length,
-                          separatorBuilder: (context, index) => SizedBox(height: 15.h),
-                          itemBuilder: (context, index) {
-                            final article = articles[index];
-                            return _buildNewsCard(article);
-                          },
-                        ),
                       );
                     },
                   ),
@@ -245,11 +250,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
               borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
               child: Image.network(
                 article.thumbnail,
-                height: 150.h,
+                height: 125.h,
                 width: double.infinity,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
-                  height: 150.h,
+                  height: 125.h,
                   color: const Color(0xFF1C1124),
                   child: Center(
                     child: Icon(Icons.satellite_alt_rounded, color: Color(0xFF382942), size: 42),
@@ -259,7 +264,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             ),
             
           Padding(
-            padding: EdgeInsets.all(14.0.r),
+            padding: EdgeInsets.all(12.0.r),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -313,26 +318,53 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                     ),
                   ],
                 ),
-                SizedBox(height: 9.h),
+                SizedBox(height: 6.h),
+                // Location Tag on a NEWLINE
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_rounded,
+                      size: 11.sp,
+                      color: const Color(0xFF8E8299),
+                    ),
+                    SizedBox(width: 3.w),
+                    Expanded(
+                      child: Text(
+                        NewsService.instance.lastResolvedCity.isNotEmpty
+                            ? NewsService.instance.lastResolvedCity
+                            : 'Local Area',
+                        style: TextStyle(
+                          color: const Color(0xFF8E8299),
+                          fontSize: 10.sp,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8.h),
                 Text(
                   article.title,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 14.5.sp,
+                    fontSize: 13.5.sp, // reduced from 14.5
                     fontWeight: FontWeight.w600,
                     fontFamily: 'Inter',
                     height: 1.25.h,
                   ),
                 ),
                 if (article.description.isNotEmpty) ...[
-                  SizedBox(height: 6.h),
+                  SizedBox(height: 5.h),
                   Text(
                     article.description.replaceAll(RegExp(r'<[^>]*>'), ''), // strip any HTML
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Color(0xFF908A99),
-                      fontSize: 12.sp,
+                      fontSize: 11.sp, // reduced from 12
                       fontFamily: 'Inter',
                       height: 1.35.h,
                     ),
