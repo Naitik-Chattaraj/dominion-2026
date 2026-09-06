@@ -4,6 +4,7 @@ import 'package:riskgrid/services/local_auth_service.dart';
 import 'package:riskgrid/models/local_user.dart';
 import 'package:riskgrid/main.dart'; // For AuthWrapper routing
 
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:riskgrid/database/riskgrid_database.dart';
 import 'package:riskgrid/services/safety_location_service.dart';
@@ -78,7 +79,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         centerTitle: true,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24.0),
+        padding: EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 140.0.h),
         children: [
           const CircleAvatar(
             radius: 50,

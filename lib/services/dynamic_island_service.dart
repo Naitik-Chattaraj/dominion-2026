@@ -15,6 +15,7 @@ class DynamicIslandService {
   void showDangerZoneAlert(
     DangerZone zone, {
     bool isNewFlag = false,
+    bool showNativeNotification = false,
     Duration duration = const Duration(seconds: 8),
   }) {
     DynamicIslandType type;
@@ -40,12 +41,14 @@ class DynamicIslandService {
 
     AppHaptics.threatZoneTap(isDanger: zone.level == 'red');
 
-    // Also trigger native notification so it appears in notification tray
-    NotificationService.instance.showHighPriorityNotification(
-      id: zone.id.hashCode,
-      title: title,
-      body: description,
-    );
+    // Only trigger native notification if explicitly requested (e.g. user enters a zone)
+    if (showNativeNotification) {
+      NotificationService.instance.showHighPriorityNotification(
+        id: zone.id.hashCode,
+        title: title,
+        body: description,
+      );
+    }
 
     alertNotifier.value = DynamicIslandAlert(
       id: '${zone.id}_${DateTime.now().millisecondsSinceEpoch}',

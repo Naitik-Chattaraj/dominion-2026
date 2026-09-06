@@ -225,6 +225,26 @@ CREATE TABLE danger_zones (
     );
   }
 
+  // Elevate a suspicious zone to danger (suspicion removed, danger enabled)
+  Future<void> elevateZoneToDanger({
+    required String oldZoneId,
+    required DangerZone elevatedZone,
+  }) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'danger_zones',
+        where: 'id = ?',
+        whereArgs: [oldZoneId],
+      );
+      await txn.insert(
+        'danger_zones',
+        elevatedZone.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
+  }
+
   Future<void> close() async {
     final db = await instance.database;
     db.close();

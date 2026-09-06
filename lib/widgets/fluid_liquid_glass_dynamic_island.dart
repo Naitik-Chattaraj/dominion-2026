@@ -5,7 +5,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../models/danger_zone.dart';
 import '../models/dynamic_island_alert.dart';
 import '../services/dynamic_island_service.dart';
+import '../services/safety_location_service.dart';
 import '../utils/app_haptics.dart';
+import 'liquid_glass_elevation_dialog.dart';
 
 class FluidLiquidGlassDynamicIsland extends StatefulWidget {
   final void Function(DangerZone zone)? onViewOnMap;
@@ -411,7 +413,55 @@ class _FluidLiquidGlassDynamicIslandState
             ),
             SizedBox(width: 8.w),
 
-            // Action: View on Map or Dismiss
+            // Action: Elevate (for suspicious zones) and View on Map or Dismiss
+            if (alert.zone != null && alert.level == 'amber') ...[
+              GestureDetector(
+                onTap: () {
+                  LiquidGlassElevationDialog.show(
+                    context,
+                    existingZone: alert.zone!,
+                    onConfirm: () async {
+                      await SafetyLocationService.instance.elevateSuspiciousZoneToDanger(
+                        existingZone: alert.zone!,
+                      );
+                      _dismiss();
+                    },
+                  );
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 5.h),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF1744).withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(
+                      color: const Color(0xFFFF1744).withValues(alpha: 0.65),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.arrow_upward_rounded,
+                        color: const Color(0xFFFF5252),
+                        size: 12.r,
+                      ),
+                      SizedBox(width: 3.w),
+                      Text(
+                        'Elevate',
+                        style: TextStyle(
+                          color: const Color(0xFFFF5252),
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(width: 6.w),
+            ],
+
             if (alert.zone != null && widget.onViewOnMap != null)
               GestureDetector(
                 onTap: () {

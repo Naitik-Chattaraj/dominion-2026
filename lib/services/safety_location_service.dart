@@ -139,7 +139,18 @@ class SafetyLocationService {
     if (newStatus == SafetyStatus.riskyArea && previousStatus != SafetyStatus.riskyArea) {
       AppHaptics.flagDanger();
       if (matchedDangerZone != null) {
-        DynamicIslandService.instance.showDangerZoneAlert(matchedDangerZone);
+        DynamicIslandService.instance.showDangerZoneAlert(
+          matchedDangerZone,
+          showNativeNotification: true, // Show native priority notification when user physically enters zone
+        );
+      }
+    } else if (newStatus == SafetyStatus.staySafe && previousStatus == SafetyStatus.allGood) {
+      AppHaptics.flagSuspicion();
+      if (matchedDangerZone != null) {
+        DynamicIslandService.instance.showDangerZoneAlert(
+          matchedDangerZone,
+          showNativeNotification: true, // Show native priority notification when user physically enters zone
+        );
       }
     }
 
@@ -182,10 +193,54 @@ class SafetyLocationService {
     await _db.createDangerZone(newZone);
     await refreshZones();
 
-    // Trigger in-app Dynamic Island alert
-    DynamicIslandService.instance.showDangerZoneAlert(newZone, isNewFlag: true);
+    // Trigger in-app Dynamic Island alert (no native notification on manual flag)
+    DynamicIslandService.instance.showDangerZoneAlert(
+      newZone,
+      isNewFlag: true,
+      showNativeNotification: false,
+    );
 
     return newZone;
+  }
+
+  /// Elevates an existing suspicious zone to a red Danger zone (removes suspicion, enables danger)
+  Future<DangerZone> elevateSuspiciousZoneToDanger({
+    required DangerZone existingZone,
+    String? category,
+    String? description,
+  }) async {
+    final elevatedZone = DangerZone(
+      id: const Uuid().v4(),
+      latitude: existingZone.latitude,
+      longitude: existingZone.longitude,
+      radiusMeters: existingZone.radiusMeters,
+      level: 'red',
+      category: (category != null && category.isNotEmpty) ? category : existingZone.category,
+      description: (description != null && description.isNotEmpty)
+          ? description
+          : (existingZone.description.isNotEmpty
+              ? '${existingZone.description} • Elevated to Danger'
+              : 'Elevated from Suspicion to Danger zone • Active 100m threat'),
+      timestamp: DateTime.now(),
+      isHistorical: false,
+    );
+
+    await _db.elevateZoneToDanger(
+      oldZoneId: existingZone.id,
+      elevatedZone: elevatedZone,
+    );
+    await refreshZones();
+
+    await AppHaptics.flagDanger();
+
+    // Trigger in-app Dynamic Island alert
+    DynamicIslandService.instance.showDangerZoneAlert(
+      elevatedZone,
+      isNewFlag: true,
+      showNativeNotification: false,
+    );
+
+    return elevatedZone;
   }
 
   void dispose() {

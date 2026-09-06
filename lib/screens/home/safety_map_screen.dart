@@ -8,6 +8,7 @@ import '../../services/safety_location_service.dart';
 import '../../services/dynamic_island_service.dart';
 import '../../widgets/liquid_glass_container.dart';
 import '../../widgets/liquid_glass_text_field.dart';
+import '../../widgets/liquid_glass_elevation_dialog.dart';
 import '../../utils/app_haptics.dart';
 
 class SafetyMapScreen extends StatefulWidget {
@@ -400,6 +401,49 @@ class _LiquidGlassFlagRiskSheetState extends State<_LiquidGlassFlagRiskSheet> {
   }
 
   Future<void> _submit() async {
+    if (_selectedLevel == 'red') {
+      // Check if this location is already marked suspicious
+      DangerZone? existingSuspiciousZone;
+      for (final z in SafetyLocationService.instance.zonesNotifier.value) {
+        if (z.level == 'amber') {
+          final dist = const Distance().as(
+            LengthUnit.Meter,
+            widget.userLocation,
+            LatLng(z.latitude, z.longitude),
+          );
+          if (dist <= z.radiusMeters + 60.0) {
+            existingSuspiciousZone = z;
+            break;
+          }
+        }
+      }
+
+      if (existingSuspiciousZone != null) {
+        final confirmed = await LiquidGlassElevationDialog.show(
+          context,
+          existingZone: existingSuspiciousZone,
+          onConfirm: () {},
+        );
+
+        if (confirmed == true) {
+          setState(() => _isSubmitting = true);
+          final elevated = await SafetyLocationService.instance.elevateSuspiciousZoneToDanger(
+            existingZone: existingSuspiciousZone,
+            category: _selectedCategory,
+            description: _descriptionController.text.trim(),
+          );
+          if (mounted) {
+            Navigator.pop(context);
+            widget.onSubmitted(elevated);
+          }
+          return;
+        } else {
+          // User chose to cancel elevation
+          return;
+        }
+      }
+    }
+
     if (_selectedLevel == 'red') {
       await AppHaptics.flagDanger();
     } else {

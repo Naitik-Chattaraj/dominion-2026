@@ -55,7 +55,8 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
 
   bool _hasTriggeredSnapHaptic = false;
 
-  static const double kSlotWidth = 64.0;
+  static const double kSlotWidth = 70.4; // 10% longer (was 64.0)
+  static const double kDockHeight = 49.5; // ~3% thicker (48.0 * 1.03)
 
   @override
   void initState() {
@@ -146,12 +147,12 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                     tintColor: const Color(0xFF0C0212),
                     enableBlur: true,
                     padding: EdgeInsets.symmetric(
-                      horizontal: 12.0,
+                      horizontal: 13.2,
                       vertical: 5.0,
                     ),
                     child: SizedBox(
                       width: totalRowWidth,
-                      height: 48.0.h,
+                      height: kDockHeight.h,
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -164,7 +165,7 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
                                   : 1.0;
 
                               return CustomPaint(
-                                size: Size(totalRowWidth, 48.0),
+                                size: Size(totalRowWidth, kDockHeight),
                                 painter: GooeySlimePainter(
                                   fromIndex: _prevIndex,
                                   toIndex: _targetIndex,
@@ -219,7 +220,7 @@ class _LiquidGlassDockNavBarState extends State<LiquidGlassDockNavBar>
 
     return SizedBox(
       width: kSlotWidth,
-      height: 48.0.h,
+      height: kDockHeight.h,
       child: MouseRegion(
         onEnter: (_) => setState(() => _hoveredIndex = index),
         onExit: (_) => setState(() {
